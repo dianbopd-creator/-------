@@ -1,0 +1,28 @@
+# fly.toml — Fly.io configuration for DIANBOPOPO backend API
+# Generated for: Node.js + Express + SQLite
+
+app = "dianbopopo-api"
+primary_region = "nrt"   # Tokyo (closest to Taiwan)
+
+[build]
+  # Uses the Dockerfile in this directory
+
+[env]
+  PORT = "3001"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+# Persistent volume for SQLite database
+[mounts]
+  source = "dianbopopo_data"
+  destination = "/data"

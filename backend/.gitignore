@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Environment variables — NEVER commit real .env
+.env
+.env.local
+.env.production
+
+# SQLite database — stored in Fly.io volume, not in Git
+db/database.sqlite
+*.sqlite
+*.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temp / upload files
+uploads/
+tmp/

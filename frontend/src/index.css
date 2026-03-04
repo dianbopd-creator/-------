@@ -1,0 +1,856 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  /* Logo Original Colors */
+  --color-logo-primary: #e4b359;
+
+  /* Hipp Health / Light SaaS Theme */
+  --color-primary: #091b31;
+  /* Deep navy */
+  --color-primary-hover: #1e3a8a;
+  --color-primary-glow: rgba(9, 27, 49, 0.08);
+
+  /* Accents */
+  --color-accent-blue: #3b82f6;
+  --color-accent-mint: #22c55e;
+  --color-accent-red: #ef4444;
+
+  /* Backgrounds — very light, clean */
+  --bg-main: #f0f2f5;
+  /* Slightly neutral light gray — like Hipp */
+  --bg-card: #ffffff;
+  --bg-sidebar: #ffffff;
+
+  /* Text */
+  --color-structural: #0f172a;
+  /* Hipp uses deep navy-black, not pure black */
+  --color-structural-light: #64748b;
+
+  /* Borders — hairline */
+  --border-structural: rgba(15, 23, 42, 0.07);
+  --border-dark: rgba(15, 23, 42, 0.10);
+  --color-error: #ef4444;
+
+  /* Typography */
+  --font-heading: 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-tech: 'Inter', sans-serif;
+
+  /* Shadows — very subtle */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-glass: 0 4px 16px rgba(0, 0, 0, 0.04);
+  --shadow-neon: 0 2px 8px rgba(9, 27, 49, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-structural);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg-main);
+  background-image: none;
+  /* No gradients */
+}
+
+h1,
+h2,
+h3,
+h4,
+.brand-font {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  /* Lighter than 700 — matches Hipp Health's weight */
+  color: var(--color-structural);
+  letter-spacing: -0.01em;
+  /* Slight negative tracking = more premium */
+}
+
+/* Structural Containers */
+.kiosk-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* No background animation - clean Hipp Health SaaS */
+.kiosk-container::before {
+  display: none;
+}
+
+/* Brand Header - Top Left */
+.brand-header {
+  position: absolute;
+  top: 2rem;
+  left: 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  z-index: 100;
+}
+
+.brand-title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-logo-primary);
+  letter-spacing: 0.05em;
+  margin: 0;
+  text-shadow: 0 0 10px rgba(228, 179, 89, 0.3);
+}
+
+.brand-subtitle {
+  font-family: var(--font-tech);
+  font-size: 0.85rem;
+  color: var(--color-structural);
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  opacity: 0.7;
+}
+
+/* Global Progress in Sidebar */
+.sidebar-global-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  padding-bottom: 2rem;
+  border-bottom: 2px solid var(--border-dark);
+}
+
+.global-step {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  opacity: 0.4;
+  transition: 0.3s;
+}
+
+.global-step.active {
+  opacity: 1;
+}
+
+.global-step-num {
+  font-family: var(--font-tech);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.15);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.global-step.active .global-step-num {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(9, 27, 49, 0.3);
+}
+
+.global-step-title {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-structural);
+}
+
+/* Wizard Grid & Alignment */
+.wizard-wrapper {
+  display: flex;
+  max-width: 1280px;
+  width: 96%;
+  margin: 0 auto;
+  padding: 2.5rem 0 4rem;
+  gap: 2rem;
+  position: relative;
+  align-items: flex-start;
+}
+
+/* Sidebar Local Progression */
+.wizard-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  padding: 2rem 1.5rem;
+  position: sticky;
+  top: calc(64px + 1.5rem);
+  height: auto;
+  max-height: calc(100vh - 64px - 3rem);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(9, 27, 49, 0.07), 0 1px 4px rgba(9, 27, 49, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+.local-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-left: 2px solid rgba(15, 23, 42, 0.07);
+  margin-top: 0.25rem;
+}
+
+.local-step {
+  padding: 0.8rem 1.25rem;
+  position: relative;
+  color: rgba(15, 23, 42, 0.4);
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: 0.25s;
+  cursor: default;
+}
+
+.local-step::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--color-primary);
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.local-step.active {
+  color: var(--color-primary);
+  font-weight: 700;
+  background: linear-gradient(90deg, rgba(9, 27, 49, 0.06) 0%, transparent 100%);
+}
+
+.local-step.active::before {
+  transform: scaleY(1);
+}
+
+.local-step.completed {
+  color: var(--color-structural);
+  font-weight: 600;
+}
+
+/* Main Form Content */
+.wizard-content {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 8px 40px rgba(9, 27, 49, 0.08), 0 2px 8px rgba(9, 27, 49, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 3rem 3.5rem;
+  min-height: 640px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 2;
+}
+
+.wizard-content form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.step-wrapper {
+  flex: 1;
+}
+
+.step-title {
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-bottom: 0.4rem;
+  display: inline-block;
+  position: relative;
+  color: var(--color-structural);
+}
+
+/* Admin-specific page content area */
+.admin-page {
+  padding: 2.25rem 2.5rem;
+  max-width: 1280px;
+}
+
+/* Admin section card */
+.admin-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-structural);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+/* Gradient accent under title */
+.step-title::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  width: 48px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-primary), rgba(9, 27, 49, 0.2));
+  border-radius: 9999px;
+}
+
+.step-desc {
+  color: rgba(15, 23, 42, 0.5);
+  margin-bottom: 2.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+}
+
+/* Hard structural inputs */
+.form-group {
+  margin-bottom: 2rem;
+}
+
+.form-label {
+  display: block;
+  font-weight: 700;
+  font-family: var(--font-tech);
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+  color: var(--color-structural);
+}
+
+.form-label.required::after {
+  content: " *";
+  color: var(--color-error);
+}
+
+.form-input {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid var(--border-dark);
+  padding: 0.9rem 1.25rem;
+  font-size: 1.05rem;
+  font-family: var(--font-body);
+  color: var(--color-structural);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 12px;
+  /* Slightly more rounded for the modern look */
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.form-input:focus {
+  outline: none;
+  background: #ffffff;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(9, 27, 49, 0.05);
+}
+
+.form-input.error {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+textarea.form-input {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.error-text {
+  color: var(--color-error);
+  font-family: var(--font-tech);
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  display: block;
+}
+
+/* Structural Select */
+select.form-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 1.25rem center;
+  background-size: 1.2em;
+  cursor: pointer;
+}
+
+/* Grids */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 2rem;
+}
+
+/* Repeater Card Tech Style */
+.repeater-card {
+  border: 1px dashed var(--border-dark);
+  padding: 2rem;
+  margin-bottom: 2rem;
+  position: relative;
+  background: #f8fafc;
+  border-radius: 24px;
+  transition: all 0.2s;
+}
+
+.repeater-card:focus-within {
+  border-color: var(--color-primary);
+  border-style: solid;
+  background: #ffffff;
+  box-shadow: var(--shadow-glass);
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  border: none;
+  color: var(--color-structural);
+  font-family: var(--font-tech);
+  font-weight: 600;
+  padding: 0.75rem 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  border-radius: 9999px;
+  /* Pill shape */
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #e2e8f0;
+  color: var(--color-structural);
+}
+
+/* Mascot Component Styles */
+.mascot-container {
+  position: fixed;
+  bottom: 0px;
+  right: 50px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  z-index: 1000;
+  padding-bottom: 2rem;
+  /* Allow clicking through the container itself, but not its children */
+  pointer-events: none;
+}
+
+/* Children should capture their own hover events */
+.mascot-container.interactive>* {
+  pointer-events: auto;
+}
+
+.mascot-bubble {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-structural);
+  padding: 1.25rem 1.75rem;
+  border-radius: 20px 20px 0 20px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  margin-right: 40px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-structural);
+  position: relative;
+  max-width: 250px;
+  word-wrap: break-word;
+  backdrop-filter: blur(12px);
+}
+
+.mascot-bubble-tail {
+  position: absolute;
+  bottom: -10px;
+  right: -1px;
+  width: 0;
+  height: 0;
+  border-top: 10px solid rgba(255, 255, 255, 0.9);
+  border-left: 15px solid transparent;
+  filter: drop-shadow(2px 2px 2px rgba(0, 0, 0, 0.05));
+}
+
+.mascot-avatar {
+  align-self: flex-end;
+  cursor: help;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.15));
+}
+
+.mascot-avatar:hover {
+  transform: scale(1.15) translateY(-10px) rotate(5deg);
+}
+
+/* Bottom Navigation */
+.wizard-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 3rem;
+  border-top: 2px solid var(--border-dark);
+}
+
+.btn-wizard {
+  padding: 1rem 3rem;
+  font-family: var(--font-tech);
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-wizard-next {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 9999px;
+  /* Pill shape */
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(9, 27, 49, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-wizard-next::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.btn-wizard-next:hover {
+  transform: translateY(-2px);
+  background: var(--color-primary-hover);
+  box-shadow: 0 8px 25px rgba(9, 27, 49, 0.2);
+}
+
+.btn-wizard-next:hover::after {
+  opacity: 1;
+}
+
+.btn-wizard-next:disabled {
+  background: transparent;
+  color: rgba(15, 23, 42, 0.35);
+  border: 2px dashed rgba(15, 23, 42, 0.2);
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+
+.btn-wizard-prev {
+  background: #f8fafc;
+  border: none;
+  color: var(--color-structural);
+  border-radius: 9999px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.btn-wizard-prev:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Brand Header - Top Left */
+.brand-header {
+  position: absolute;
+  top: 2rem;
+  left: 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  z-index: 100;
+}
+
+.brand-title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.brand-subtitle {
+  font-family: var(--font-tech);
+  font-size: 0.85rem;
+  color: var(--color-structural);
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  opacity: 0.8;
+}
+
+/* Kanban Nested Design Styles (Vibrant Glass Aesthetic) */
+.kanban-main-phase {
+  background: var(--bg-card);
+  border: 1px solid var(--border-structural);
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  min-width: 350px;
+  flex: 0 0 auto;
+  box-shadow: var(--shadow-glass);
+  overflow: hidden;
+}
+
+.kanban-phase-header {
+  padding: 1.25rem 1rem;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: var(--color-structural);
+  border-bottom: 1px solid var(--border-dark);
+  background: rgba(255, 255, 255, 0.6);
+  position: relative;
+}
+
+.kanban-phase-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+}
+
+.kanban-phase-header.phase-1::before {
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent-magenta));
+}
+
+.kanban-phase-header.phase-2::before {
+  background: linear-gradient(90deg, var(--color-accent-blue), var(--color-accent-mint));
+}
+
+.kanban-phase-header.phase-3::before {
+  background: linear-gradient(90deg, var(--color-accent-orange), var(--color-accent-yellow));
+}
+
+.kanban-phase-header.phase-4::before {
+  background: var(--color-structural);
+}
+
+.kanban-sub-stages {
+  display: flex;
+  flex: 1;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.kanban-sub-stage-col {
+  flex: 1;
+  min-width: 250px;
+  background: #f8fafc;
+  border: 1px solid var(--border-dark);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  box-shadow: none;
+  transition: all 0.2s;
+}
+
+.kanban-sub-stage-col:hover {
+  background: #ffffff;
+  border-color: var(--color-primary-glow);
+  box-shadow: 0 10px 25px rgba(9, 27, 49, 0.05);
+}
+
+.kanban-sub-stage-header {
+  font-family: var(--font-tech);
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--color-structural);
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--border-dark);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  box-shadow: 0 0 8px currentColor;
+}
+
+/* Profile Modal Styles */
+.profile-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  /* Very slight background blur to block distractions */
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-modal-content {
+  background: var(--bg-card);
+  padding: 2.5rem;
+  border-radius: 32px;
+  width: 450px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--border-structural) inset;
+  border: none;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* === Print Styles === */
+@media print {
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: white !important;
+  }
+
+  /* Hide everything outside of the main content area */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Specifically target the container we want to print */
+  .wizard-content,
+  .wizard-content *,
+  .print-container,
+  .print-container * {
+    visibility: visible;
+  }
+
+  /* Override the main layout wrapper to avoid scrollbars or cropping */
+  #root,
+  .app-container,
+  main {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  .print-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: white !important;
+  }
+
+  /* Hide everything outside of the main content area */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Specifically target the container we want to print */
+  .wizard-content,
+  .wizard-content *,
+  .print-container,
+  .print-container * {
+    visibility: visible;
+  }
+
+  /* Override the main layout wrapper to avoid scrollbars or cropping */
+  #root,
+  .app-container,
+  main {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  .print-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .wizard-content {
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    padding: 0 !important;
+    margin-bottom: 2rem !important;
+    break-inside: avoid;
+    backdrop-filter: none;
+  }
+
+  /* Disable CSS grid for printing, stack everything vertically for better A4 flow */
+  .print-grid-reset {
+    display: block !important;
+  }
+
+  .print-grid-reset>div {
+    margin-bottom: 2rem;
+    page-break-inside: avoid;
+  }
+
+  /* Hide elements marked with .no-print */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Prevent page breaks inside important elements */
+  img,
+  svg,
+  .kanban-sub-stage-col,
+  h2,
+  h3,
+  h4,
+  th,
+  td,
+  tr,
+  li,
+  p {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  h2,
+  h3,
+  h4 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}

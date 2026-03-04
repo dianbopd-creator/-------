@@ -1,0 +1,18 @@
+# Root level gitignore
+node_modules/
+.env
+.env.local
+.DS_Store
+Thumbs.db
+*.log
+
+# SQLite databases
+*.sqlite
+*.db
+
+# Build outputs
+frontend/dist/
+
+# Test files
+test_out.txt
+colortest/

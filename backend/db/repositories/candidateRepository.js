@@ -65,35 +65,21 @@ exports.createCandidate = (id, fields) => {
 };
 
 exports.addWorkExperiences = async (candidateId, experiences) => {
-    const stmt = db.prepare(
-        `INSERT INTO work_experiences (candidate_id, job_title, years, achievements) VALUES (?, ?, ?, ?)`
+    await run(`DELETE FROM work_experiences WHERE candidate_id = ?`, [candidateId]);
+    const promises = experiences.map(exp =>
+        run(`INSERT INTO work_experiences (candidate_id, job_title, years, achievements) VALUES (?, ?, ?, ?)`,
+            [candidateId, exp.job_title, exp.years, exp.achievements])
     );
-    let hasError = false;
-    await new Promise((resolve) => {
-        experiences.forEach(exp => {
-            stmt.run([candidateId, exp.job_title, exp.years, exp.achievements], (err) => {
-                if (err) hasError = true;
-            });
-        });
-        stmt.finalize(() => resolve());
-    });
-    if (hasError) throw new Error('Failed to save one or more work experiences');
+    await Promise.all(promises);
 };
 
 exports.saveAnswers = async (candidateId, answers) => {
-    const stmt = db.prepare(
-        `INSERT INTO answers (candidate_id, question_code, answer_text) VALUES (?, ?, ?)`
+    await run(`DELETE FROM answers WHERE candidate_id = ?`, [candidateId]);
+    const promises = answers.map(ans =>
+        run(`INSERT INTO answers (candidate_id, question_code, answer_text) VALUES (?, ?, ?)`,
+            [candidateId, ans.question_code, ans.answer_text])
     );
-    let hasError = false;
-    await new Promise((resolve) => {
-        answers.forEach(ans => {
-            stmt.run([candidateId, ans.question_code, ans.answer_text], (err) => {
-                if (err) hasError = true;
-            });
-        });
-        stmt.finalize(() => resolve());
-    });
-    if (hasError) throw new Error('Failed to save one or more answers');
+    await Promise.all(promises);
 };
 
 exports.savePersonalityScore = (candidateId, scores) => {
@@ -140,6 +126,7 @@ exports.findAll = () => {
         SELECT c.*, j.department as jc_department, j.position as jc_position, j.stages
         FROM candidates c
         LEFT JOIN job_categories j ON c.job_category_id = j.id
+        WHERE c.status != 'pending' AND c.status IS NOT NULL
         ORDER BY c.created_at DESC
     `);
 };
@@ -147,7 +134,17 @@ exports.findAll = () => {
 // ── Related data ──────────────────────────────────────────────────────────────
 
 exports.getAnswersByCandidate = (candidateId) => {
-    return all(`SELECT * FROM answers WHERE candidate_id = ?`, [candidateId]);
+    return all(`
+        SELECT a.*,
+               CASE WHEN a.question_code ~ '^[0-9]+$'
+                    THEN q.question_text
+                    ELSE NULL
+               END AS question_text
+        FROM answers a
+        LEFT JOIN questions q ON a.question_code ~ '^[0-9]+$' AND q.id = CAST(a.question_code AS INTEGER)
+        WHERE a.candidate_id = ?
+        ORDER BY a.id ASC
+    `, [candidateId]);
 };
 
 exports.getPersonalityByCandidate = (candidateId) => {
@@ -169,7 +166,7 @@ exports.deleteResumeText = (candidateId) => {
 exports.deleteCandidate = async (candidateId) => {
     // Delete in dependency order
     await run(`DELETE FROM ai_reports WHERE candidate_id = ?`, [candidateId]);
-    await run(`DELETE FROM interview_scores WHERE candidate_id = ?`, [candidateId]);
+    await run(`DELETE FROM interview_scores_v2 WHERE candidate_id = ?`, [candidateId]);
     await run(`DELETE FROM evaluations WHERE candidate_id = ?`, [candidateId]);
     await run(`DELETE FROM personality_scores WHERE candidate_id = ?`, [candidateId]);
     await run(`DELETE FROM answers WHERE candidate_id = ?`, [candidateId]);

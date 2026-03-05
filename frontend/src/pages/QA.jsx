@@ -51,16 +51,10 @@ const QA = () => {
 
                 setQuestions(data);
 
-                // Restore draft
+                // Auto-restore draft silently
                 const draft = localStorage.getItem(`qa_draft_${candidateId}`);
                 if (draft) {
-                    try {
-                        if (window.confirm('發現您有未送出的專業問答草稿，是否要還原上次填寫的內容？')) {
-                            setAnswers(JSON.parse(draft));
-                        } else {
-                            localStorage.removeItem(`qa_draft_${candidateId}`);
-                        }
-                    } catch { /* ignore */ }
+                    try { setAnswers(JSON.parse(draft)); } catch { /* ignore */ }
                 }
             } catch (err) {
                 console.error('Failed to load questions:', err);
@@ -99,7 +93,19 @@ const QA = () => {
     const currentQuestions = currentCategory ? categories[currentCategory] : [];
     const totalSteps = categoryList.length;
 
-    const nextStep = () => { setDirection(1); setCurrentStep(p => Math.min(p + 1, totalSteps - 1)); };
+    const checkRequired = (questionsToCheck) => {
+        const missing = questionsToCheck.filter(q => q.is_required && !answers[q.id]?.trim());
+        if (missing.length > 0) {
+            alert(`以下必填題目尚未填寫：\n${missing.map((q, i) => `${i + 1}. ${q.question_text}`).join('\n')}`);
+            return false;
+        }
+        return true;
+    };
+
+    const nextStep = () => {
+        if (!checkRequired(currentQuestions)) return;
+        setDirection(1); setCurrentStep(p => Math.min(p + 1, totalSteps - 1));
+    };
     const prevStep = () => { setDirection(-1); setCurrentStep(p => Math.max(p - 1, 0)); };
 
     const handleAnswer = (qId, value) => {
@@ -107,6 +113,12 @@ const QA = () => {
     };
 
     const onSubmit = async () => {
+        // Validate all categories before submitting
+        const allRequired = questions.filter(q => q.is_required && !answers[q.id]?.trim());
+        if (allRequired.length > 0) {
+            alert(`以下必填題目尚未填寫：\n${allRequired.map((q, i) => `${i + 1}. ${q.question_text}`).join('\n')}`);
+            return;
+        }
         setSubmitting(true);
         try {
             const formattedAnswers = Object.entries(answers)
@@ -145,7 +157,7 @@ const QA = () => {
                 {/* Sidebar */}
                 <aside className="wizard-sidebar">
                     <div className="sidebar-global-progress">
-                        <div className="global-step completed">
+                        <div className="global-step completed" style={{ cursor: 'pointer' }} onClick={() => navigate('/basic-info')} title="點擊返回基本資料">
                             <span className="global-step-num"><Check size={16} /></span>
                             <span className="global-step-title" style={{ opacity: 0.7 }}>基本資料</span>
                         </div>
@@ -161,7 +173,11 @@ const QA = () => {
 
                     <div className="local-step-list">
                         {categoryList.map((cat, idx) => (
-                            <div key={cat} className={`local-step ${currentStep === idx ? 'active' : ''} ${currentStep > idx ? 'completed' : ''}`}>
+                            <div key={cat}
+                                className={`local-step ${currentStep === idx ? 'active' : ''} ${currentStep > idx ? 'completed' : ''}`}
+                                onClick={() => { if (idx < currentStep) { setDirection(-1); setCurrentStep(idx); } }}
+                                style={{ cursor: idx < currentStep ? 'pointer' : 'default' }}
+                            >
                                 {cat}
                             </div>
                         ))}
@@ -210,7 +226,10 @@ const QA = () => {
                                                         value={answers[q.id] || ''}
                                                         onChange={e => handleAnswer(q.id, e.target.value)}
                                                         placeholder="請在此輸入您的回答..."
-                                                        style={{ resize: 'vertical', minHeight: '100px' }}
+                                                        style={{
+                                                            resize: 'vertical', minHeight: '100px',
+                                                            borderColor: q.is_required && !answers[q.id]?.trim() ? '#ef4444' : undefined
+                                                        }}
                                                     />
                                                 )}
                                             </div>

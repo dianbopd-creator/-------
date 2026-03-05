@@ -5,8 +5,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 exports.generateAiReport = async (candidateId) => {
     if (!process.env.GEMINI_API_KEY) {
-        console.warn('GEMINI_API_KEY is not set. Skipping AI report generation.');
-        return;
+        throw new Error('未設定 GEMINI_API_KEY，請先前往系統環境變數設定。');
     }
 
     try {
@@ -215,7 +214,7 @@ ${qaSection || '  （無問答資料）'}
 `;
 
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
 

@@ -1,4 +1,4 @@
-const db = require('../database');
+const db = require('../db/connection');
 const Scoring = require('../utils/scoring');
 
 const PI_SERVER_API = {

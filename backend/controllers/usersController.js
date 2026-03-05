@@ -1,4 +1,4 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const AdminRepo = require('../db/repositories/adminRepository');
 
 const SALT_ROUNDS = 10;

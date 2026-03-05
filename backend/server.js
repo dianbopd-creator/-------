@@ -27,15 +27,22 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
-app.get('/api/health', (req, res) => {
+// Vercel strips /api prefix when routing to api/index.js, so mount at /health
+app.get(['/api/health', '/health'], (req, res) => {
     res.json({ status: 'ok', message: 'DIANBOPOPO Interview System API is running', timezone: 'Asia/Taipei' });
 });
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
 const apiRoutes = require('./routes/api');
+// Vercel strips the /api prefix, so Express receives /v1/... not /api/v1/...
+// When running locally, /api/v1 is also mounted for compatibility
+app.use('/v1', apiRoutes);
 app.use('/api/v1', apiRoutes);
 
-app.listen(PORT, () => {
-    console.log(`[DIANBOPOPO] Server running on port ${PORT}`);
-    console.log(`[CORS] Allowed origins: ${allowedOrigins.join(', ')}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`[DIANBOPOPO] Server running on port ${PORT}`);
+        console.log(`[CORS] Allowed origins: ${allowedOrigins.join(', ')}`);
+    });
+}
+module.exports = app;

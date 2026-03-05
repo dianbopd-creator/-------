@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ShieldCheck, Shield, QrCode, KeyRound, Loader2, CheckCircle2, AlertTriangle, ChevronRight } from 'lucide-react';
 
 const SecuritySettings = () => {
-    const { user } = useAuth();
+    const { user, updateUserContext } = useAuth();
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
     const [step, setStep] = useState('status'); // 'status' | 'qr' | 'confirm' | 'disable'
@@ -69,6 +69,8 @@ const SecuritySettings = () => {
             setStep('status');
             fetchStatus();
             setToken('');
+            // Update context so the 2FA gate in AdminLayout dismisses immediately
+            updateUserContext({ totp_enabled: true });
         } catch (err) {
             setMessage({ type: 'error', text: err.message });
         } finally {

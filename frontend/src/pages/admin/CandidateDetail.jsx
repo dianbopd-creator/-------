@@ -9,7 +9,8 @@ import remarkGfm from 'remark-gfm';
 import questionsData from '../../data/questions.json';
 import InterviewScoreForm from '../../components/InterviewScoreForm';
 
-const questionMap = questionsData.reduce((acc, cat) => {
+// Static fallback map from bundled questions.json (old alphanumeric codes)
+const STATIC_QUESTION_MAP = questionsData.reduce((acc, cat) => {
     cat.questions.forEach(q => acc[q.id] = q.text);
     return acc;
 }, {});
@@ -76,6 +77,23 @@ const CandidateDetail = () => {
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
     const authHeaders = { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` };
+
+    // Merged question map: static json (old codes) + DB questions (new integer IDs)
+    const [questionMap, setQuestionMap] = useState(STATIC_QUESTION_MAP);
+    useEffect(() => {
+        fetch(`${apiUrl}/admin/questions`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` } })
+            .then(r => r.ok ? r.json() : null)
+            .then(body => {
+                if (body && Array.isArray(body.data)) {
+                    const dbMap = {};
+                    body.data.forEach(q => {
+                        dbMap[String(q.id)] = q.question_text;  // integer id → text
+                    });
+                    setQuestionMap(prev => ({ ...prev, ...dbMap }));
+                }
+            })
+            .catch(() => { });
+    }, []);
 
     const fetchComments = useCallback(async () => {
         try {
@@ -502,7 +520,7 @@ const CandidateDetail = () => {
                                     <div key={idx} style={{ background: '#ffffff', padding: '1.4rem', border: '1px solid var(--border-structural)', borderLeft: '4px solid var(--color-accent-blue)', borderRadius: '0 12px 12px 0' }}>
                                         <div style={{ fontWeight: '700', color: 'var(--color-structural)', marginBottom: '0.75rem', fontSize: '1rem', fontFamily: 'var(--font-heading)' }}>
                                             <span style={{ color: 'var(--color-accent-blue)', marginRight: '6px' }}>Q{idx + 1}.</span>
-                                            {questionMap[ans.question_code] || ans.question_code}
+                                            {questionMap[ans.question_code] || ans.question_text || ans.question_code}
                                         </div>
                                         <div style={{ color: 'var(--color-structural)', whiteSpace: 'pre-wrap', lineHeight: '1.8', fontSize: '0.95rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px' }}>{ans.answer_text}</div>
                                     </div>

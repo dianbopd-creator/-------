@@ -4,7 +4,7 @@ import {
     PieChart, Pie, Cell, ResponsiveContainer, Funnel, FunnelChart,
     LabelList, LineChart, Line, AreaChart, Area
 } from 'recharts';
-import { Loader2, Users, TrendingUp, Briefcase, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Users, TrendingUp, Briefcase, CheckCircle, AlertCircle, Filter } from 'lucide-react';
 
 const COLORS = ['#1e3a8a', '#2563eb', '#06b6d4', '#22c55e', '#eab308', '#f97316', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -43,26 +43,72 @@ const AnalyticsDashboard = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [jobCategories, setJobCategories] = useState([]);
+
+    // Filters
+    const [dateRange, setDateRange] = useState('30d');
+    const [customStart, setCustomStart] = useState('');
+    const [customEnd, setCustomEnd] = useState('');
+    const [selectedJobId, setSelectedJobId] = useState('all');
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
+    // Fetch Job Categories for filter dropdown
     useEffect(() => {
-        const fetchAnalytics = async () => {
+        const fetchCategories = async () => {
             try {
-                const res = await fetch(`${apiUrl}/admin/analytics/dashboard`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
-                });
-                if (!res.ok) throw new Error('Failed to fetch analytics data');
-                const json = await res.json();
-                setData(json);
+                const res = await fetch(`${apiUrl}/categories`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setJobCategories(data);
+                }
             } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
+                console.error("Failed to load categories for filter", err);
             }
         };
+        fetchCategories();
+    }, [apiUrl]);
+
+    const fetchAnalytics = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            let start = '';
+            let end = '';
+            if (dateRange === '30d') {
+                const d = new Date();
+                d.setDate(d.getDate() - 30);
+                start = d.toISOString().split('T')[0];
+            } else if (dateRange === '7d') {
+                const d = new Date();
+                d.setDate(d.getDate() - 7);
+                start = d.toISOString().split('T')[0];
+            } else if (dateRange === 'custom') {
+                start = customStart;
+                end = customEnd;
+            }
+
+            const queryParams = new URLSearchParams();
+            if (start) queryParams.append('startDate', start);
+            if (end) queryParams.append('endDate', end);
+            if (selectedJobId !== 'all') queryParams.append('jobCategoryId', selectedJobId);
+
+            const res = await fetch(`${apiUrl}/admin/analytics/dashboard?${queryParams.toString()}`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
+            });
+            if (!res.ok) throw new Error('Failed to fetch analytics data');
+            const json = await res.json();
+            setData(json);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchAnalytics();
-    }, []);
+    }, [dateRange, customStart, customEnd, selectedJobId]);
 
     if (loading) return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '12px', color: 'var(--color-primary)', fontSize: '1.1rem' }}>
@@ -111,10 +157,57 @@ const AnalyticsDashboard = () => {
     return (
         <div style={{ padding: '3rem', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
-            {/* Header */}
-            <div style={{ borderBottom: '2px solid rgba(15,23,42,0.08)', paddingBottom: '1.5rem' }}>
-                <h1 className="step-title" style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>數據洞察</h1>
-                <p className="step-desc" style={{ margin: 0 }}>即時掌握招募漏斗效率、各職缺熱度與流程健康度。</p>
+            {/* Header & Filters */}
+            <div style={{ borderBottom: '2px solid rgba(15,23,42,0.08)', paddingBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                    <h1 className="step-title" style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>數據洞察</h1>
+                    <p className="step-desc" style={{ margin: 0 }}>即時掌握招募漏斗效率、各職缺熱度與流程健康度。</p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: '#fff', padding: '0.75rem', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.08)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Filter size={16} color="var(--color-primary)" />
+                        <select
+                            value={dateRange}
+                            onChange={(e) => setDateRange(e.target.value)}
+                            style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--border-dark)', fontSize: '0.85rem', outline: 'none', background: '#f8fafc' }}>
+                            <option value="all">所有時間</option>
+                            <option value="30d">近 30 天</option>
+                            <option value="7d">近 7 天</option>
+                            <option value="custom">自訂區間</option>
+                        </select>
+                    </div>
+
+                    {dateRange === 'custom' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                                type="date"
+                                value={customStart}
+                                onChange={(e) => setCustomStart(e.target.value)}
+                                style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border-dark)', fontSize: '0.85rem' }}
+                            />
+                            <span style={{ color: 'rgba(15,23,42,0.4)', fontSize: '0.85rem' }}>至</span>
+                            <input
+                                type="date"
+                                value={customEnd}
+                                onChange={(e) => setCustomEnd(e.target.value)}
+                                style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border-dark)', fontSize: '0.85rem' }}
+                            />
+                        </div>
+                    )}
+
+                    <div style={{ width: '1px', height: '24px', background: 'rgba(15,23,42,0.1)' }} />
+
+                    <select
+                        value={selectedJobId}
+                        onChange={(e) => setSelectedJobId(e.target.value)}
+                        style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--border-dark)', fontSize: '0.85rem', outline: 'none', background: '#f8fafc', maxWidth: '200px' }}>
+                        <option value="all">所有職位</option>
+                        {jobCategories.map(jc => (
+                            <option key={jc.id} value={jc.id}>{jc.department} - {jc.position}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             {/* KPI Cards */}

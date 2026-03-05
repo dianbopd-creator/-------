@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const Scoring = require('../utils/scoring');
 const { QUESTION_BANK } = require('../utils/questions');
 const aiService = require('../services/aiService');
@@ -6,7 +6,7 @@ const CandidateRepo = require('../db/repositories/candidateRepository');
 
 exports.createCandidate = async (req, res) => {
     const { work_experiences, ...fields } = req.body;
-    const id = uuidv4();
+    const id = crypto.randomUUID();
 
     try {
         await CandidateRepo.createCandidate(id, fields);

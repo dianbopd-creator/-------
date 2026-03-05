@@ -60,6 +60,8 @@ const localSteps = [
     { id: 4, title: '職涯與夢想', desc: '未來的成長藍圖' }
 ];
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+
 const BasicInfo = () => {
     const navigate = useNavigate();
     const [currentStep, setCurrentStep] = useState(1);
@@ -69,7 +71,7 @@ const BasicInfo = () => {
     useEffect(() => {
         const fetchCategories = async () => {
             try {
-                const res = await fetch('http://localhost:3001/api/v1/categories');
+                const res = await fetch(`${API_URL}/categories`);
                 const data = await res.json();
                 setCategories(data.data || []);
             } catch (err) {
@@ -138,14 +140,9 @@ const BasicInfo = () => {
         if (draft) {
             try {
                 const parsed = JSON.parse(draft);
-                // Prompt user to restore
-                if (window.confirm('發現您有未送出的基本資料草稿，是否要還原上次填寫的內容？')) {
-                    reset(parsed);
-                } else {
-                    localStorage.removeItem('basic_info_draft');
-                }
+                reset(parsed); // Auto-restore silently
             } catch (e) {
-                console.error('Failed to parse draft', e);
+                localStorage.removeItem('basic_info_draft');
             }
         }
     }, [reset]);
@@ -186,7 +183,7 @@ const BasicInfo = () => {
             // Combine ROC date
             data.birth_date = `民國${data.rocYear}年${data.rocMonth}月${data.rocDay}日`;
 
-            const response = await fetch('http://localhost:3001/api/v1/candidates', {
+            const response = await fetch(`${API_URL}/candidates`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -231,10 +228,19 @@ const BasicInfo = () => {
 
                     <div className="local-step-list">
                         {localSteps.map(step => (
-                            <div key={step.id} className={clsx("local-step", {
-                                'active': currentStep === step.id,
-                                'completed': currentStep > step.id
-                            })}>
+                            <div key={step.id}
+                                className={clsx('local-step', {
+                                    'active': currentStep === step.id,
+                                    'completed': currentStep > step.id
+                                })}
+                                onClick={() => {
+                                    if (step.id < currentStep) {
+                                        setDirection(-1);
+                                        setCurrentStep(step.id);
+                                    }
+                                }}
+                                style={{ cursor: step.id < currentStep ? 'pointer' : 'default' }}
+                            >
                                 {step.title}
                             </div>
                         ))}

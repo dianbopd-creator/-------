@@ -108,8 +108,8 @@ exports.getEvaluationsByCandidate = (candidateId) => {
     return all(`
         SELECT e.id, e.comments, e.created_at, a.username as evaluator_name
         FROM evaluations e
-        JOIN admin_users a ON e.evaluator_id = a.id
-        WHERE e.candidate_id = ?
+        LEFT JOIN admin_users a ON e.evaluator_id = a.id
+        WHERE e.candidate_id = $1
         ORDER BY e.created_at DESC
     `, [candidateId]);
 };

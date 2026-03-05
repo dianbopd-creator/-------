@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Search, Loader2, Eye, GripVertical, FileSpreadsheet, Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { Search, Loader2, Eye, GripVertical, FileSpreadsheet, Plus, Edit, Trash2, Save, X, Library, CheckSquare, Square } from 'lucide-react';
 import { formatDate, daysSince, todayDateString } from '../../utils/dateUtils';
 
 const AdminDashboard = () => {
@@ -22,25 +22,33 @@ const AdminDashboard = () => {
     const [editingCategory, setEditingCategory] = useState(null);
     const [formData, setFormData] = useState({ department: '', position: '', stages: [] });
 
-    // The 4 fixed phases per user requirements screenshot
-    const FIXED_PHASES = ['篩選合格', '邀約面試', '甄試作業', '錄用'];
+    // JD + Question Assignment State (merged from JobManagement)
+    const [jobDetails, setJobDetails] = useState({ description: '', requirements: '', location: '', salary: '', headcount: '1' });
+    const [allQuestions, setAllQuestions] = useState([]);
+    const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
+    const [draggedQuestionIndex, setDraggedQuestionIndex] = useState(null);
+    const [modalTab, setModalTab] = useState('stages'); // 'stages' | 'jd' | 'questions'
+    const [qFilter, setQFilter] = useState(''); // category filter in 指派題目 tab
+
+    // Hiring flow phases — matches real-world process after pre-screening
+    const FIXED_PHASES = ['邀約面試', '現場面談', '確認意願', '錄取作業'];
 
     const parseStages = (stagesData) => {
         if (!stagesData || !stagesData.length) {
             return [
-                { name: '篩選合格', stages: ['初篩合格'] },
-                { name: '邀約面試', stages: ['待面試'] },
-                { name: '甄試作業', stages: ['核定中'] },
-                { name: '錄用', stages: ['即將到職'] }
+                { name: '邀約面試', stages: ['已邀約', '待確認時間'] },
+                { name: '現場面談', stages: ['面試中', '已面試'] },
+                { name: '確認意願', stages: ['求職者確認意願', '已回覆'] },
+                { name: '錄取作業', stages: ['發錄取通知', '等待報到', '已報到', '未錄取'] }
             ];
         }
         if (typeof stagesData[0] === 'string') {
             const bucketSize = Math.ceil(stagesData.length / 4) || 1;
             return [
-                { name: '篩選合格', stages: stagesData.slice(0, bucketSize) },
-                { name: '邀約面試', stages: stagesData.slice(bucketSize, bucketSize * 2) },
-                { name: '甄試作業', stages: stagesData.slice(bucketSize * 2, bucketSize * 3) },
-                { name: '錄用', stages: stagesData.slice(bucketSize * 3) }
+                { name: '邀約面試', stages: stagesData.slice(0, bucketSize) },
+                { name: '現場面談', stages: stagesData.slice(bucketSize, bucketSize * 2) },
+                { name: '確認意願', stages: stagesData.slice(bucketSize * 2, bucketSize * 3) },
+                { name: '錄取作業', stages: stagesData.slice(bucketSize * 3) }
             ];
         }
         return stagesData;
@@ -185,12 +193,30 @@ const AdminDashboard = () => {
         document.body.removeChild(link);
     };
 
-    // --- Category Management Functions ---
+    const fetchAllQuestions = async () => {
+        try {
+            const res = await fetch(`${apiUrl}/admin/questions`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` } });
+            if (res.ok) { const j = await res.json(); setAllQuestions(j.data || []); }
+        } catch { }
+    };
+
+    const fetchJobQuestions = async (jobId) => {
+        try {
+            const res = await fetch(`${apiUrl}/admin/jobs/${jobId}/questions`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` } });
+            if (res.ok) { const j = await res.json(); setSelectedQuestionIds((j.data || []).map(q => q.id)); }
+        } catch { }
+    };
+
     const handleOpenCategoryModal = (cat = null) => {
         if (cat) {
             setEditingCategory(cat.id);
+            const catDetails = cat.details ? (typeof cat.details === 'string' ? JSON.parse(cat.details) : cat.details) : {};
             setFormData({ department: cat.department, position: cat.position, stages: parseStages(cat.stages) });
-            setIsEditingStages(true); // Toggle the inline editor on when editing a category
+            setJobDetails({ description: catDetails.description || '', requirements: catDetails.requirements || '', location: catDetails.location || '', salary: catDetails.salary || '', headcount: catDetails.headcount || '1' });
+            setSelectedQuestionIds([]);
+            fetchJobQuestions(cat.id);
+            fetchAllQuestions();
+            setIsEditingStages(true);
             setSelectedCategoryId(cat.id.toString());
         } else {
             setEditingCategory(null);
@@ -301,19 +327,27 @@ const AdminDashboard = () => {
             const url = `${apiUrl}/admin/job-categories/${selectedCategory.id}`;
             const response = await fetch(url, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` },
                 body: JSON.stringify({
                     department: formData.department,
                     position: formData.position,
-                    stages: formData.stages
+                    stages: formData.stages,
+                    details: jobDetails
                 })
             });
-
             const data = await response.json();
             if (!response.ok) throw new Error(data.error);
+
+            // Save question assignments
+            const qRes = await fetch(`${apiUrl}/admin/jobs/${selectedCategory.id}/questions`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` },
+                body: JSON.stringify({ question_ids: selectedQuestionIds })
+            });
+            if (!qRes.ok) {
+                const qData = await qRes.json();
+                throw new Error(`無法儲存指派題目: ${qData.error || '未知的錯誤'}`);
+            }
 
             setIsEditingStages(false);
             fetchData();
@@ -567,94 +601,257 @@ const AdminDashboard = () => {
             {/* ══ STAGE EDITOR — FULL-SCREEN MODAL ══ */}
             {isEditingStages && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(9,27,49,0.55)', backdropFilter: 'blur(6px)', zIndex: 2000, display: 'flex', alignItems: 'stretch', justifyContent: 'center', padding: '2rem' }}
-                    onClick={e => { if (e.target === e.currentTarget) { setIsEditingStages(false); fetchData(); } }}>
-                    <div style={{ background: '#f8fafc', borderRadius: '20px', width: '100%', maxWidth: '1100px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 32px 80px rgba(9,27,49,0.25)' }}>
+                    onClick={e => { if (e.target === e.currentTarget) { setIsEditingStages(false); setModalTab('stages'); fetchData(); } }}>
+                    <div style={{ background: '#f8fafc', borderRadius: '20px', width: '100%', maxWidth: '900px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 32px 80px rgba(9,27,49,0.25)' }}>
 
                         {/* Modal Header */}
-                        <div style={{ padding: '1.5rem 2rem', background: '#fff', borderBottom: '1px solid rgba(15,23,42,0.08)', display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
+                        <div style={{ padding: '1.25rem 2rem', background: '#fff', borderBottom: '1px solid rgba(15,23,42,0.08)', display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
                             <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: '0.78rem', fontWeight: '700', color: 'rgba(15,23,42,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--font-tech)', marginBottom: '0.25rem' }}>甄試看板 / 編輯流程</div>
-                                <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: '800', color: 'var(--color-structural)', fontFamily: 'var(--font-heading)' }}>編輯甄試流程階段</h2>
+                                <div style={{ fontSize: '0.75rem', fontWeight: '700', color: 'rgba(15,23,42,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--font-tech)', marginBottom: '0.2rem' }}>甄試看板 / 編輯流程</div>
+                                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: 'var(--color-structural)', fontFamily: 'var(--font-heading)' }}>
+                                    {formData.department} — {formData.position || '新增職缺'}
+                                </h2>
                             </div>
-                            <button onClick={() => { setIsEditingStages(false); fetchData(); }} style={{ background: 'rgba(15,23,42,0.06)', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-structural)', transition: 'all 0.15s' }}
+                            <button onClick={() => { setIsEditingStages(false); setModalTab('stages'); fetchData(); }} style={{ background: 'rgba(15,23,42,0.06)', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-structural)', transition: 'all 0.15s' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,23,42,0.12)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'rgba(15,23,42,0.06)'}>
                                 <X size={18} />
                             </button>
                         </div>
 
-                        {/* Job Info Row */}
-                        <div style={{ padding: '1.25rem 2rem', background: '#fff', borderBottom: '1px solid rgba(15,23,42,0.06)', display: 'flex', gap: '1.25rem', alignItems: 'flex-end', flexShrink: 0 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 160px' }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'rgba(15,23,42,0.45)', letterSpacing: '0.04em' }}>部門名稱</label>
+                        {/* Department / Position row (always visible) */}
+                        <div style={{ padding: '1rem 2rem', background: '#fff', borderBottom: '1px solid rgba(15,23,42,0.06)', display: 'flex', gap: '1rem', alignItems: 'flex-end', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 140px' }}>
+                                <label style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(15,23,42,0.45)', letterSpacing: '0.04em' }}>部門名稱</label>
                                 <input type="text" className="form-input" value={formData.department}
                                     onChange={e => setFormData({ ...formData, department: e.target.value })}
-                                    placeholder="業務部" style={{ margin: 0, fontSize: '1rem', fontWeight: '600' }} required />
+                                    placeholder="業務部" style={{ margin: 0, fontWeight: '600' }} required />
                             </div>
                             <span style={{ color: 'rgba(15,23,42,0.25)', fontSize: '1.5rem', lineHeight: '2.4rem' }}>–</span>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '2 1 220px' }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'rgba(15,23,42,0.45)', letterSpacing: '0.04em' }}>職缺名稱</label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '2 1 200px' }}>
+                                <label style={{ fontSize: '0.72rem', fontWeight: '700', color: 'rgba(15,23,42,0.45)', letterSpacing: '0.04em' }}>職缺名稱</label>
                                 <input type="text" className="form-input" value={formData.position}
                                     onChange={e => setFormData({ ...formData, position: e.target.value })}
-                                    placeholder="業務助理" style={{ margin: 0, fontSize: '1rem', fontWeight: '600' }} required />
+                                    placeholder="業務助理" style={{ margin: 0, fontWeight: '600' }} required />
                             </div>
-                            <p style={{ margin: '0 0 0 0.5rem', fontSize: '0.8rem', color: 'rgba(15,23,42,0.4)', lineHeight: '1.5', maxWidth: '280px', flexShrink: 1 }}>
-                                💡 拖拉圓形標籤可跨欄移動；點「+ 新增」可增加子流程；直接點文字可編輯名稱。
-                            </p>
                         </div>
 
-                        {/* Phase Columns */}
-                        <div style={{ flex: 1, overflow: 'auto', padding: '1.5rem 2rem', display: 'flex', gap: '1.25rem', alignItems: 'flex-start' }}>
-                            {formData.stages.map((phase, pIndex) => {
-                                const pastelBg = pIndex === 0 ? '#EAF6F6' : pIndex === 1 ? '#EAF6DF' : pIndex === 2 ? '#FCF6E3' : '#E8F4F8';
-                                const accentColor = pIndex === 0 ? '#0d9488' : pIndex === 1 ? '#65a30d' : pIndex === 2 ? '#ca8a04' : '#0369a1';
-                                return (
-                                    <div key={pIndex}
-                                        style={{ background: pastelBg, borderRadius: '12px', minWidth: '220px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
-                                        onDragOver={e => e.preventDefault()}
-                                        onDrop={e => { if (e.target === e.currentTarget || e.currentTarget.contains(e.target)) handleStageEditorDrop(e, pIndex); }}>
+                        {/* Tab Bar */}
+                        <div style={{ display: 'flex', borderBottom: '1px solid rgba(15,23,42,0.08)', background: '#fff', flexShrink: 0 }}>
+                            {[
+                                { key: 'stages', label: '流程階段' },
+                                { key: 'jd', label: '職位資訊 (JD)' },
+                                { key: 'questions', label: `指派題目${selectedQuestionIds.length > 0 ? ` (${selectedQuestionIds.length})` : ''}` },
+                            ].map(tab => (
+                                <button key={tab.key} onClick={() => setModalTab(tab.key)}
+                                    style={{
+                                        padding: '0.75rem 1.5rem', border: 'none', cursor: 'pointer', fontSize: '0.88rem', fontWeight: modalTab === tab.key ? '700' : '500',
+                                        color: modalTab === tab.key ? 'var(--color-primary)' : 'rgba(15,23,42,0.5)',
+                                        background: 'transparent',
+                                        borderBottom: modalTab === tab.key ? '2px solid var(--color-primary)' : '2px solid transparent',
+                                        transition: 'all 0.15s',
+                                    }}>
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
 
-                                        {/* Phase Header */}
-                                        <div style={{ padding: '0.9rem 1rem', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.95rem', color: accentColor, borderBottom: `2px solid ${accentColor}20`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                                            <span>{phase.name}</span>
-                                            <span style={{ fontSize: '0.75rem', background: `${accentColor}18`, color: accentColor, borderRadius: '9999px', padding: '2px 10px', fontFamily: 'var(--font-tech)' }}>{phase.stages.length} 個</span>
+                        {/* Tab: 流程階段 */}
+                        {modalTab === 'stages' && (
+                            <div style={{ flex: 1, overflow: 'auto', padding: '1.5rem 2rem', display: 'flex', gap: '1.25rem', alignItems: 'flex-start' }}>
+                                {formData.stages.map((phase, pIndex) => {
+                                    const pastelBg = pIndex === 0 ? '#EAF6F6' : pIndex === 1 ? '#EAF6DF' : pIndex === 2 ? '#FCF6E3' : '#E8F4F8';
+                                    const accentColor = pIndex === 0 ? '#0d9488' : pIndex === 1 ? '#65a30d' : pIndex === 2 ? '#ca8a04' : '#0369a1';
+                                    return (
+                                        <div key={pIndex}
+                                            style={{ background: pastelBg, borderRadius: '12px', minWidth: '200px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
+                                            onDragOver={e => e.preventDefault()}
+                                            onDrop={e => { if (e.target === e.currentTarget || e.currentTarget.contains(e.target)) handleStageEditorDrop(e, pIndex); }}>
+                                            <div style={{ padding: '0.9rem 1rem', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.95rem', color: accentColor, borderBottom: `2px solid ${accentColor}20`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                                                <span>{phase.name}</span>
+                                                <span style={{ fontSize: '0.75rem', background: `${accentColor}18`, color: accentColor, borderRadius: '9999px', padding: '2px 10px', fontFamily: 'var(--font-tech)' }}>{phase.stages.length} 個</span>
+                                            </div>
+                                            <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', flex: 1, overflowY: 'auto', minHeight: '120px' }}>
+                                                {phase.stages.map((stage, sIndex) => (
+                                                    <div key={sIndex}
+                                                        draggable
+                                                        onDragStart={e => handleStageEditorDragStart(e, pIndex, sIndex)}
+                                                        onDragOver={e => e.preventDefault()}
+                                                        onDrop={e => { e.stopPropagation(); handleStageEditorDrop(e, pIndex, sIndex); }}
+                                                        style={{ background: 'white', borderRadius: '10px', padding: '0.6rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.6rem', boxShadow: '0 2px 6px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.06)', cursor: 'grab' }}
+                                                        className="stage-editor-pill">
+                                                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: accentColor, flexShrink: 0 }} />
+                                                        <input type="text"
+                                                            style={{ border: 'none', background: 'transparent', flex: 1, outline: 'none', fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-structural)', minWidth: 0 }}
+                                                            value={stage}
+                                                            onChange={e => updateStageName(pIndex, sIndex, e.target.value)}
+                                                            placeholder="流程名稱" />
+                                                        <button type="button" onClick={() => removeStage(pIndex, sIndex)}
+                                                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px 4px', opacity: 0.4, flexShrink: 0, transition: 'opacity 0.15s' }}
+                                                            onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                                                            onMouseLeave={e => e.currentTarget.style.opacity = '0.4'}>
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <button type="button" onClick={() => addStage(pIndex)}
+                                                    style={{ background: 'transparent', border: `1.5px dashed ${accentColor}50`, color: accentColor, borderRadius: '10px', padding: '0.55rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '600', transition: 'all 0.15s' }}
+                                                    onMouseEnter={e => e.currentTarget.style.background = `${accentColor}10`}
+                                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                    <Plus size={15} /> 新增子流程
+                                                </button>
+                                            </div>
                                         </div>
+                                    );
+                                })}
+                            </div>
+                        )}
 
-                                        {/* Stage pills */}
-                                        <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', flex: 1, overflowY: 'auto', minHeight: '120px' }}>
-                                            {phase.stages.map((stage, sIndex) => (
-                                                <div key={sIndex}
-                                                    draggable
-                                                    onDragStart={e => handleStageEditorDragStart(e, pIndex, sIndex)}
-                                                    onDragOver={e => e.preventDefault()}
-                                                    onDrop={e => { e.stopPropagation(); handleStageEditorDrop(e, pIndex, sIndex); }}
-                                                    style={{ background: 'white', borderRadius: '10px', padding: '0.6rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.6rem', boxShadow: '0 2px 6px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.06)', cursor: 'grab' }}
-                                                    className="stage-editor-pill">
-                                                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: accentColor, flexShrink: 0 }} />
-                                                    <input type="text"
-                                                        style={{ border: 'none', background: 'transparent', flex: 1, outline: 'none', fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-structural)', minWidth: 0 }}
-                                                        value={stage}
-                                                        onChange={e => updateStageName(pIndex, sIndex, e.target.value)}
-                                                        placeholder="流程名稱" />
-                                                    <button type="button" onClick={() => removeStage(pIndex, sIndex)}
-                                                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px 4px', opacity: 0.4, flexShrink: 0, transition: 'opacity 0.15s' }}
-                                                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                                                        onMouseLeave={e => e.currentTarget.style.opacity = '0.4'}>
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            <button type="button" onClick={() => addStage(pIndex)}
-                                                style={{ background: 'transparent', border: `1.5px dashed ${accentColor}50`, color: accentColor, borderRadius: '10px', padding: '0.55rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '600', transition: 'all 0.15s' }}
-                                                onMouseEnter={e => e.currentTarget.style.background = `${accentColor}10`}
-                                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                                <Plus size={15} /> 新增子流程
-                                            </button>
+                        {/* Tab: 職位資訊 (JD) */}
+                        {modalTab === 'jd' && (
+                            <div style={{ flex: 1, overflow: 'auto', padding: '1.5rem 2rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '640px' }}>
+                                    <div style={{ display: 'flex', gap: '1rem' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'rgba(15,23,42,0.5)', display: 'block', marginBottom: '4px' }}>上班地點</label>
+                                            <input type="text" className="form-input" value={jobDetails.location} onChange={e => setJobDetails(p => ({ ...p, location: e.target.value }))} placeholder="例如: 台北市信義區" style={{ margin: 0 }} />
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'rgba(15,23,42,0.5)', display: 'block', marginBottom: '4px' }}>薪資待遇</label>
+                                            <input type="text" className="form-input" value={jobDetails.salary} onChange={e => setJobDetails(p => ({ ...p, salary: e.target.value }))} placeholder="例如: 月薪 40K+" style={{ margin: 0 }} />
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'rgba(15,23,42,0.5)', display: 'block', marginBottom: '4px' }}>職務說明 (JD)</label>
+                                        <textarea className="form-input" rows={5} value={jobDetails.description} onChange={e => setJobDetails(p => ({ ...p, description: e.target.value }))} placeholder="描述工作內容、日常職責..." style={{ resize: 'vertical', margin: 0 }} />
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'rgba(15,23,42,0.5)', display: 'block', marginBottom: '4px' }}>條件要求</label>
+                                        <textarea className="form-input" rows={4} value={jobDetails.requirements} onChange={e => setJobDetails(p => ({ ...p, requirements: e.target.value }))} placeholder="技能需求、學歷、語文條件等..." style={{ resize: 'vertical', margin: 0 }} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Tab: 指派題目 */}
+                        {modalTab === 'questions' && (() => {
+                            const allCats = [...new Set(allQuestions.map(q => q.category || '通用'))];
+                            const visible = qFilter ? allQuestions.filter(q => (q.category || '通用') === qFilter) : allQuestions;
+                            const visibleIds = visible.map(q => q.id);
+                            const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedQuestionIds.includes(id));
+
+                            const handleDragStart = (e, index) => {
+                                setDraggedQuestionIndex(index);
+                                e.dataTransfer.effectAllowed = 'move';
+                            };
+
+                            const handleDragOver = (e, index) => {
+                                e.preventDefault();
+                                if (draggedQuestionIndex === null || draggedQuestionIndex === index) return;
+
+                                const newIds = [...selectedQuestionIds];
+                                const draggedId = newIds[draggedQuestionIndex];
+                                newIds.splice(draggedQuestionIndex, 1);
+                                newIds.splice(index, 0, draggedId);
+
+                                setSelectedQuestionIds(newIds);
+                                setDraggedQuestionIndex(index);
+                            };
+
+                            const handleDragEnd = () => {
+                                setDraggedQuestionIndex(null);
+                            };
+
+                            return (
+                                <div style={{ flex: 1, overflow: 'auto', padding: '1.5rem 2rem' }}>
+                                    {/* Toolbar */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                                        <button onClick={() => {
+                                            if (allVisibleSelected) {
+                                                setSelectedQuestionIds(prev => prev.filter(id => !visibleIds.includes(id)));
+                                            } else {
+                                                // Append new ones to the end
+                                                setSelectedQuestionIds(prev => [...new Set([...prev, ...visibleIds])]);
+                                            }
+                                        }} style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: '1.5px solid var(--color-primary)', background: allVisibleSelected ? 'var(--color-primary)' : 'transparent', color: allVisibleSelected ? '#fff' : 'var(--color-primary)', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s' }}>
+                                            {allVisibleSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                                            {allVisibleSelected ? '取消全選' : '全選'}
+                                            {qFilter && ` (${qFilter})`}
+                                        </button>
+                                        <div style={{ width: '1px', height: '20px', background: 'rgba(15,23,42,0.12)' }} />
+                                        <button onClick={() => setQFilter('')} style={{ padding: '0.35rem 0.8rem', borderRadius: '999px', border: `1.5px solid ${!qFilter ? 'var(--color-primary)' : 'rgba(15,23,42,0.15)'}`, background: !qFilter ? 'rgba(30,58,138,0.06)' : 'transparent', color: !qFilter ? 'var(--color-primary)' : 'rgba(15,23,42,0.5)', fontWeight: '600', fontSize: '0.75rem', cursor: 'pointer' }}>全部</button>
+                                        {allCats.map(cat => (
+                                            <button key={cat} onClick={() => setQFilter(cat === qFilter ? '' : cat)} style={{ padding: '0.35rem 0.8rem', borderRadius: '999px', border: `1.5px solid ${qFilter === cat ? 'var(--color-primary)' : 'rgba(15,23,42,0.15)'}`, background: qFilter === cat ? 'rgba(30,58,138,0.06)' : 'transparent', color: qFilter === cat ? 'var(--color-primary)' : 'rgba(15,23,42,0.5)', fontWeight: '600', fontSize: '0.75rem', cursor: 'pointer' }}>{cat}</button>
+                                        ))}
+                                        <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'rgba(15,23,42,0.4)' }}>{selectedQuestionIds.length}/{allQuestions.length} 已選</span>
+                                    </div>
+                                    {allQuestions.length === 0 ? (
+                                        <div style={{ padding: '2rem', background: 'rgba(15,23,42,0.03)', borderRadius: '12px', textAlign: 'center', color: 'rgba(15,23,42,0.4)' }}>題庫尚無題目，請先至「題庫中心」新增題目。</div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+                                            {/* Selected & Ordered Questions */}
+                                            {selectedQuestionIds.length > 0 && (
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--color-structural)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        已選題目 (上下拖曳排序)
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                        {selectedQuestionIds.map((id, index) => {
+                                                            const q = allQuestions.find(aq => aq.id === id);
+                                                            if (!q) return null;
+                                                            return (
+                                                                <div
+                                                                    key={`sel-${id}`}
+                                                                    draggable
+                                                                    onDragStart={(e) => handleDragStart(e, index)}
+                                                                    onDragOver={(e) => handleDragOver(e, index)}
+                                                                    onDragEnd={handleDragEnd}
+                                                                    style={{
+                                                                        display: 'flex', alignItems: 'center', gap: '10px', padding: '0.6rem 1rem',
+                                                                        borderRadius: '8px', border: '1.5px solid var(--color-primary)',
+                                                                        background: 'rgba(30,58,138,0.04)', cursor: 'grab',
+                                                                        opacity: draggedQuestionIndex === index ? 0.5 : 1
+                                                                    }}>
+                                                                    <GripVertical size={16} color="rgba(15,23,42,0.25)" style={{ cursor: 'grab' }} />
+                                                                    <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-primary)', background: '#fff', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(30,58,138,0.2)' }}>{index + 1}</span>
+                                                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                                                        <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--color-structural)', lineHeight: '1.4' }}>{q.question_text}</div>
+                                                                    </div>
+                                                                    <button onClick={() => setSelectedQuestionIds(prev => prev.filter(pid => pid !== id))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--color-error)' }}><X size={16} /></button>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Unselected Questions Pool */}
+                                            <div>
+                                                <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'rgba(15,23,42,0.5)', marginBottom: '8px', borderTop: selectedQuestionIds.length > 0 ? '1px solid rgba(15,23,42,0.08)' : 'none', paddingTop: selectedQuestionIds.length > 0 ? '1rem' : '0' }}>
+                                                    待選題庫
+                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                    {visible.filter(q => !selectedQuestionIds.includes(q.id)).map(q => {
+                                                        return (
+                                                            <div key={q.id} onClick={() => setSelectedQuestionIds(prev => [...prev, q.id])}
+                                                                style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '0.6rem 1rem', borderRadius: '8px', border: '1.5px solid rgba(15,23,42,0.08)', background: '#fafafa', cursor: 'pointer', transition: 'all 0.15s' }}>
+                                                                <Square size={16} color="rgba(15,23,42,0.25)" style={{ flexShrink: 0, marginTop: '1px' }} />
+                                                                <div style={{ minWidth: 0 }}>
+                                                                    <div style={{ fontSize: '0.85rem', fontWeight: '500', color: 'rgba(15,23,42,0.7)', lineHeight: '1.4' }}>{q.question_text}</div>
+                                                                    <div style={{ fontSize: '0.72rem', color: 'rgba(15,23,42,0.4)', marginTop: '2px' }}>{q.category}{q.is_required ? ' · 必填' : ''}</div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         {/* Modal Footer */}
                         <div style={{ padding: '1.25rem 2rem', background: '#fff', borderTop: '1px solid rgba(15,23,42,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
@@ -669,7 +866,7 @@ const AdminDashboard = () => {
                                 )}
                             </div>
                             <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                <button onClick={() => { setIsEditingStages(false); fetchData(); }} className="btn-secondary" style={{ padding: '0.6rem 1.2rem' }}>取消</button>
+                                <button onClick={() => { setIsEditingStages(false); setModalTab('stages'); fetchData(); }} className="btn-secondary" style={{ padding: '0.6rem 1.2rem' }}>取消</button>
                                 <button onClick={handleSaveStages} style={{ background: 'var(--color-primary)', color: '#fff', border: 'none', padding: '0.6rem 1.5rem', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '0.9rem', transition: 'all 0.2s' }}
                                     onMouseEnter={e => e.currentTarget.style.opacity = '0.88'}
                                     onMouseLeave={e => e.currentTarget.style.opacity = '1'}>

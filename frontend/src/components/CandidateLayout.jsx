@@ -16,12 +16,12 @@ const CandidateLayout = ({ children, step = 1 }) => {
 
     return (
         <div className="kiosk-container" style={{ background: 'linear-gradient(135deg, #f0f4f8 0%, #e8edf5 100%)' }}>
-            {/* ── Top Navigation Bar ── */}
+            {/* ── Top Navigation Bar (FIXED — always visible) ── */}
             <header style={{
-                position: 'sticky',
-                top: 0,
+                position: 'fixed',
+                top: 0, left: 0, right: 0,
                 zIndex: 200,
-                background: 'rgba(255,255,255,0.92)',
+                background: 'rgba(255,255,255,0.97)',
                 backdropFilter: 'blur(16px)',
                 WebkitBackdropFilter: 'blur(16px)',
                 borderBottom: '1px solid rgba(15,23,42,0.07)',
@@ -35,25 +35,15 @@ const CandidateLayout = ({ children, step = 1 }) => {
                 {/* Brand */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                     <span style={{
-                        fontFamily: 'var(--font-heading)',
-                        fontWeight: 800,
-                        fontSize: '1.15rem',
-                        color: 'var(--color-logo-primary)',
-                        letterSpacing: '0.08em',
-                        lineHeight: 1,
-                    }}>
-                        DIANBOPOPO
-                    </span>
+                        fontFamily: 'var(--font-heading)', fontWeight: 800,
+                        fontSize: '1.15rem', color: 'var(--color-logo-primary)',
+                        letterSpacing: '0.08em', lineHeight: 1,
+                    }}>DIANBOPOPO</span>
                     <span style={{
-                        fontFamily: 'var(--font-tech)',
-                        fontSize: '0.62rem',
-                        color: 'rgba(9,27,49,0.45)',
-                        letterSpacing: '0.18em',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                    }}>
-                        電波澎澎面試系統
-                    </span>
+                        fontFamily: 'var(--font-tech)', fontSize: '0.62rem',
+                        color: 'rgba(9,27,49,0.45)', letterSpacing: '0.18em',
+                        fontWeight: 700, textTransform: 'uppercase',
+                    }}>電波澎澎面試系統</span>
                 </div>
 
                 {/* Step Tracker */}
@@ -70,8 +60,7 @@ const CandidateLayout = ({ children, step = 1 }) => {
                                         fontWeight: 700, fontSize: '0.72rem',
                                         background: isDone ? 'var(--color-accent-mint)' : isActive ? 'var(--color-primary)' : 'rgba(15,23,42,0.1)',
                                         color: isDone || isActive ? '#fff' : 'rgba(15,23,42,0.4)',
-                                        transition: 'all 0.3s',
-                                        flexShrink: 0,
+                                        transition: 'all 0.3s', flexShrink: 0,
                                     }}>
                                         {isDone ? '✓' : s.id}
                                     </div>
@@ -80,9 +69,7 @@ const CandidateLayout = ({ children, step = 1 }) => {
                                         fontWeight: isActive ? 700 : 500,
                                         color: isActive ? 'var(--color-primary)' : isDone ? 'var(--color-accent-mint)' : 'rgba(15,23,42,0.4)',
                                         transition: 'all 0.3s',
-                                    }}>
-                                        {s.label}
-                                    </span>
+                                    }}>{s.label}</span>
                                 </div>
                                 {idx < steps.length - 1 && (
                                     <div style={{ width: '32px', height: '1px', background: 'rgba(15,23,42,0.12)' }} />
@@ -92,12 +79,11 @@ const CandidateLayout = ({ children, step = 1 }) => {
                     })}
                 </nav>
 
-                {/* Right: empty balancer */}
                 <div style={{ width: '180px' }} />
             </header>
 
-            {/* ── Page Body ── */}
-            <main style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem 4rem' }}>
+            {/* ── Page Body (top padding = header height) ── */}
+            <main style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem 4rem', paddingTop: '80px' }}>
                 {children}
             </main>
         </div>

@@ -1,4 +1,4 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const CandidateRepo = require('../db/repositories/candidateRepository');
 const AdminRepo = require('../db/repositories/adminRepository');
@@ -35,9 +35,9 @@ exports.login = async (req, res) => {
             });
         }
 
-        // === No 2FA — issue real JWT immediately ===
+        // === No 2FA — issue real JWT (with totp_enabled flag) ===
         const token = jwt.sign(
-            { id: user.id, username: user.username, role: user.role },
+            { id: user.id, username: user.username, role: user.role, totp_enabled: !!user.totp_enabled },
             JWT_SECRET,
             { expiresIn: '8h' }
         );
@@ -87,25 +87,28 @@ exports.getCandidateById = async (req, res) => {
         try { candidate.stages = candidate.stages ? JSON.parse(candidate.stages) : []; } catch { candidate.stages = []; }
         delete candidate.jc_department;
         delete candidate.jc_position;
+        delete candidate.jc_details;
 
+        // Each sub-query is independently fault-tolerant
         const [answers, personality, evaluations, workExperiences, tags] = await Promise.all([
-            CandidateRepo.getAnswersByCandidate(id),
-            CandidateRepo.getPersonalityByCandidate(id),
-            AdminRepo.getEvaluationsByCandidate(id),
-            CandidateRepo.getWorkExperiencesByCandidate(id),
-            TagRepo.getCandidateTags(id)
+            CandidateRepo.getAnswersByCandidate(id).catch(e => { console.error('[getCandidateById] answers error:', e.message); return []; }),
+            CandidateRepo.getPersonalityByCandidate(id).catch(e => { console.error('[getCandidateById] personality error:', e.message); return null; }),
+            AdminRepo.getEvaluationsByCandidate(id).catch(e => { console.error('[getCandidateById] evaluations error:', e.message); return []; }),
+            CandidateRepo.getWorkExperiencesByCandidate(id).catch(e => { console.error('[getCandidateById] workExp error:', e.message); return []; }),
+            TagRepo.getCandidateTags(id).catch(e => { console.error('[getCandidateById] tags error:', e.message); return []; }),
         ]);
 
         res.json({
             candidate,
             workExperiences: workExperiences || [],
-            answers,
+            answers: answers || [],
             personality,
             tags: tags || [],
             aiReport: candidate.ai_analysis_report ? { raw_analysis: candidate.ai_analysis_report } : null,
             evaluations: evaluations || []
         });
     } catch (err) {
+        console.error('[getCandidateById] top-level error:', err.message, err.stack);
         res.status(500).json({ error: err.message });
     }
 };

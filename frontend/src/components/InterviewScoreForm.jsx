@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ClipboardList, X, Save, Loader2, Check } from 'lucide-react';
-import { formatShortDateTime } from '../../utils/dateUtils';
+import { formatShortDateTime } from '../utils/dateUtils';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 const CATEGORIES = [

@@ -15,7 +15,6 @@ import UserManagement from './pages/admin/UserManagement';
 import JobCategories from './pages/admin/JobCategories';
 import AuditLogs from './pages/admin/AuditLogs';
 import AdminDashboard from './pages/admin/AdminDashboard';
-import JobManagement from './pages/admin/JobManagement';
 import ResumeManagement from './pages/admin/ResumeManagement';
 import CandidateDetail from './pages/admin/CandidateDetail';
 import SecuritySettings from './pages/admin/SecuritySettings';
@@ -78,7 +77,6 @@ function App() {
           {/* Protected Admin Routes */}
           <Route element={<AdminProtectedRoute />}>
             <Route element={<AdminLayout />}>
-              <Route path="/admin/jobs" element={<JobManagement />} />
               <Route path="/admin/resumes" element={<ResumeManagement />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/analytics" element={<AnalyticsDashboard />} />

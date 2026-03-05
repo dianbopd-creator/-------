@@ -5,6 +5,8 @@ import { Check } from 'lucide-react';
 import clsx from 'clsx';
 import { QuestionPicker } from '../utils/colortest_picker';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+
 const PersonalityTest = () => {
     const navigate = useNavigate();
     const candidateId = sessionStorage.getItem('candidateId');
@@ -70,7 +72,7 @@ const PersonalityTest = () => {
         setIsSubmitting(true);
         try {
             // 1. Submit personality test data
-            const response = await fetch(`http://localhost:3001/api/v1/candidates/${candidateId}/personality`, {
+            const response = await fetch(`${API_URL}/candidates/${candidateId}/personality`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -83,7 +85,7 @@ const PersonalityTest = () => {
             if (!response.ok) throw new Error('提交性格測驗失敗');
 
             // 2. Trigger final submission to mark candidate as 'completed'
-            const finalRes = await fetch(`http://localhost:3001/api/v1/candidates/${candidateId}/submit`, {
+            const finalRes = await fetch(`${API_URL}/candidates/${candidateId}/submit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });

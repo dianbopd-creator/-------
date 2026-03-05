@@ -17,7 +17,7 @@ exports.verifyToken = (req, res, next) => {
         if (err) {
             return res.status(401).json({ error: 'Unauthorized: Invalid token' });
         }
-        req.user = decoded; // { id, username, role }
+        req.user = decoded; // { id, username, role, totp_enabled? }
         next();
     });
 };

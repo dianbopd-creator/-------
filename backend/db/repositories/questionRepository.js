@@ -38,7 +38,7 @@ const setQuestionsForJob = async (jobCategoryId, questionIds) => {
     // Replace all assignments for this job
     await dbRun(`DELETE FROM job_questions WHERE job_category_id = ?`, [jobCategoryId]);
     for (let i = 0; i < questionIds.length; i++) {
-        await dbRun(`INSERT OR IGNORE INTO job_questions (job_category_id, question_id, order_index) VALUES (?, ?, ?)`,
+        await dbRun(`INSERT INTO job_questions (job_category_id, question_id, order_index) VALUES (?, ?, ?) ON CONFLICT (job_category_id, question_id) DO NOTHING`,
             [jobCategoryId, questionIds[i], i]);
     }
 };

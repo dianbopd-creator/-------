@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 const AdminLayout = () => {
-    const { user, login } = useAuth();
+    const { user, login, updateUserContext } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -33,17 +33,38 @@ const AdminLayout = () => {
     const [passwordError, setPasswordError] = useState('');
     const [passwordLoading, setPasswordLoading] = useState(false);
     const [passwordSuccess, setPasswordSuccess] = useState(false);
+    // ── Auto-sync 2FA status to fix stale localStorage sessions ──────────
+    // When user.totp_enabled is missing/false (old session), verify from backend
+    // The /2fa/status endpoint is exempt from the 2FA middleware block
+    useEffect(() => {
+        if (user && !user.totp_enabled) {
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+            fetch(`${apiUrl}/admin/2fa/status`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.enabled) {
+                        updateUserContext({ totp_enabled: true });
+                    }
+                })
+                .catch(() => { }); // silently fail — gate will still show if backend unreachable
+        }
+    }, [user?.id]); // only re-run if user changes
 
     if (!user) return <Navigate to="/admin/login" replace />;
 
     const isAdmin = user.role === 'admin' || user.role === 'superadmin';
+
+    // ── Mandatory 2FA gate ──────────────────────────────────────────────────
+    // If user hasn't enabled 2FA, block access until they set it up
+    const needs2FASetup = !user.totp_enabled && location.pathname !== '/admin/security';
 
     // Navigation groups — like Hipp Health's grouped sidebar
     const navGroups = [
         {
             label: '招募管理',
             items: [
-                { label: '職缺管理', path: '/admin/jobs', icon: Briefcase },
                 { label: '履歷總管', path: '/admin/resumes', icon: FileText },
                 { label: '甄試看板', path: '/admin/dashboard', icon: Activity },
                 { label: '數據洞察', path: '/admin/analytics', icon: BarChart2 },
@@ -133,6 +154,29 @@ const AdminLayout = () => {
 
     return (
         <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--bg-main)' }}>
+
+            {/* ════════════════════ 2FA ENFORCEMENT GATE ════════════════════ */}
+            {needs2FASetup && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(9,27,49,0.75)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: '20px', padding: '3rem 2.5rem', maxWidth: '460px', width: '90%', textAlign: 'center', boxShadow: '0 32px 80px rgba(9,27,49,0.3)' }}>
+                        <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                            <ShieldCheck size={32} color="#d97706" />
+                        </div>
+                        <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--color-structural)', marginBottom: '0.75rem' }}>請先啟用雙重驗證 (2FA)</h2>
+                        <p style={{ fontSize: '0.9rem', color: 'rgba(15,23,42,0.6)', lineHeight: '1.7', marginBottom: '2rem' }}>
+                            為保障帳號與系統安全，所有後台人員必須啟用<strong>雙重驗證 (Google Authenticator)</strong> 才能存取管理後台。
+                        </p>
+                        <button onClick={() => navigate('/admin/security')}
+                            style={{ background: '#d97706', color: '#fff', border: 'none', padding: '0.85rem 2rem', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', fontSize: '1rem', width: '100%', transition: 'opacity 0.15s' }}
+                            onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+                            onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+                            <ShieldCheck size={16} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
+                            前往啟用 2FA
+                        </button>
+                        <p style={{ fontSize: '0.78rem', color: 'rgba(15,23,42,0.35)', marginTop: '1rem' }}>啟用完成後即可正常使用所有後台功能</p>
+                    </div>
+                </div>
+            )}
 
             {/* ════════════════════════════════════════
                 LEFT SIDEBAR

@@ -4,11 +4,22 @@ const CandidateRepo = require('../db/repositories/candidateRepository');
 const path = require('path');
 const fs = require('fs');
 
-// pdf-parse v2.x changed API: use new PDFParse({ data: buffer }).getText()
-const { PDFParse } = require('pdf-parse');
+// pdf-parse v1.x exports a single async function: pdfParse(buffer) => { text, ... }
+const pdfParse = require('pdf-parse');
 
-const UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'resumes');
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const os = require('os');
+
+// 在 Vercel Serverless 環境中，只有 /tmp 目錄可寫入
+const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+const UPLOAD_DIR = isVercel
+    ? path.join(os.tmpdir(), 'resumes')
+    : path.join(__dirname, '..', 'uploads', 'resumes');
+
+function ensureUploadDir() {
+    if (!fs.existsSync(UPLOAD_DIR)) {
+        fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    }
+}
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -30,14 +41,12 @@ exports.uploadResume = async (req, res) => {
     const { id } = req.params;
     if (!req.file) return res.status(400).json({ error: '請上傳 PDF 或 Word 檔案' });
 
-    let parser = null;
     try {
         let extractedText = '';
         const mime = req.file.mimetype;
 
         if (mime === 'application/pdf') {
-            parser = new PDFParse({ data: req.file.buffer });
-            const data = await parser.getText();
+            const data = await pdfParse(req.file.buffer);
             extractedText = data.text || '';
         } else {
             const result = await mammoth.extractRawText({ buffer: req.file.buffer });
@@ -53,37 +62,63 @@ exports.uploadResume = async (req, res) => {
             return res.status(422).json({ error: '無法從此檔案中提取文字，請確認檔案未加密且含有文字內容' });
         }
 
-        // Save original file to disk
+        // Save original file to disk (transient in Vercel, just for iframe preview)
+        ensureUploadDir();
         const ext = mime === 'application/pdf' ? '.pdf' : '.docx';
         const filename = `${id}${ext}`;
         const filepath = path.join(UPLOAD_DIR, filename);
         fs.writeFileSync(filepath, req.file.buffer);
 
-        await CandidateRepo.saveResumeText(id, extractedText, filename);
+        // Convert buffer to Base64 for persistent storage in DB
+        const fileB64 = req.file.buffer.toString('base64');
+
+        await CandidateRepo.saveResumeText(id, extractedText, filename, fileB64);
         res.json({ message: '履歷上傳並解析成功', preview: extractedText.substring(0, 300), length: extractedText.length });
 
     } catch (err) {
         console.error('[Resume Upload] Error:', err.message);
         res.status(500).json({ error: '解析失敗: ' + err.message });
-    } finally {
-        if (parser) await parser.destroy().catch(() => { });
     }
 };
 
 // GET /admin/candidates/:id/resume-file  — stream the original file
-exports.getResumeFile = (req, res) => {
+exports.getResumeFile = async (req, res) => {
     const { id } = req.params;
-    // Try pdf first, then docx
-    for (const ext of ['.pdf', '.docx']) {
-        const filepath = path.join(UPLOAD_DIR, `${id}${ext}`);
-        if (fs.existsSync(filepath)) {
-            const mime = ext === '.pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    try {
+        // 1. Check database first for base64
+        let doc = null;
+        try {
+            doc = await CandidateRepo.getResumeB64(id);
+        } catch (dbErr) {
+            console.warn('[Resume GET DB fallback]', dbErr.message);
+            // Column might not exist yet; fallback to local
+        }
+
+        if (doc && doc.resume_file_b64) {
+            const buffer = Buffer.from(doc.resume_file_b64, 'base64');
+            const ext = doc.resume_file_name ? String(doc.resume_file_name).toLowerCase() : '';
+            const mime = ext.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
             res.setHeader('Content-Type', mime);
             res.setHeader('Content-Disposition', 'inline');
-            return fs.createReadStream(filepath).pipe(res);
+            return res.send(buffer);
         }
+
+        // 2. Fallback to local transient file system (for older records without base64 or local dev without populated DB)
+        for (const ext of ['.pdf', '.docx']) {
+            const filepath = path.join(UPLOAD_DIR, `${id}${ext}`);
+            if (fs.existsSync(filepath)) {
+                const mime = ext === '.pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                res.setHeader('Content-Type', mime);
+                res.setHeader('Content-Disposition', 'inline');
+                return fs.createReadStream(filepath).pipe(res);
+            }
+        }
+        res.status(404).json({ error: '找不到原始履歷檔案' });
+    } catch (e) {
+        console.error('[Resume GET] Error:', e.message);
+        res.status(500).json({ error: '讀取履歷檔案發生錯誤' });
     }
-    res.status(404).json({ error: '找不到原始履歷檔案' });
 };
 
 // DELETE /admin/candidates/:id/resume

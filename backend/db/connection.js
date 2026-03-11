@@ -156,6 +156,8 @@ async function initDB() {
                 position TEXT,
                 totp_secret TEXT,
                 totp_enabled INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                permissions_json TEXT DEFAULT '[]',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 

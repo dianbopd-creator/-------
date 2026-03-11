@@ -34,14 +34,16 @@ exports.generateAiReport = async (candidateId) => {
   - ⚡ CRI 真實度指數：${personality.cri_score ?? 0}/10（越高表示作答越誠實）` : '  （尚無性格測驗資料）';
 
         const prompt = `
-你是一位擁有 20 年經驗的頂尖資深人資長（CHRO），曾服務於麥肯錫、台積電、遠傳電信等企業，專精業務人才識別、行為面試深度分析與職涯規劃建議。
+你是一位擁有 20 年經驗的頂尖資深人資長（CHRO），曾服務於麥肯錫、台積電、遠傳電信等企業，專精於高階人才識別、行為面試深度分析與職涯規劃建議。
 
-你現在要為以下一位求職者撰寫一份**極具洞察力且可直接用於面試決策**的人才評鑑報告。
+你現在要為以下一位求職者撰寫一份**極具洞察力、客觀且可直接用於面試決策**的人才評鑑報告。
+請務必緊扣該名求職者所應徵的職缺：【${candidate.jc_department || '未知部門'} - ${candidate.jc_position || '未知職缺'}】，用最高標準來審視其潛力。
 
 報告目標讀者是公司主管與 HR 主管，必須：
-1. **排版清晰**，每個段落獨立、易於快速閱讀
-2. **分析有具體引用**，引用候選人的原話或數字來佐證觀點
-3. **給出明確建議**，不要模糊說「表現尚可」，要說「建議做 OOO 因為 XXX」
+1. **排版清晰**，每個段落獨立、易於快速閱讀。
+2. **分析有具體引用**，引用候選人的原話或數字來佐證觀點。
+3. **針對性強**，切勿使用萬用樣板語言，必須根據【${candidate.jc_position || '該職缺'}】的實際需求來評斷好壞。
+4. **給出明確建議**，不要模糊說「表現尚可」，要說「建議做 OOO 因為 XXX」。
 
 ---
 
@@ -51,31 +53,32 @@ exports.generateAiReport = async (candidateId) => {
 
 **基本資料：**
 - 姓名：${candidate.name}
-- 學歷：${candidate.education_school} ${candidate.education_major ? `（${candidate.education_major}）` : ''}
+- 學歷：${candidate.education_school} ${candidate.education_major ? '（' + candidate.education_major + '）' : ''}
 - 專長技能：${candidate.skills || '未填'}
 - 證照：${candidate.certifications || '無'}
 - 離職原因：${candidate.leave_reason || '未填'}
 - 應徵動機：${candidate.motivation || '未填'}
-- 職涯規劃：短期【${candidate.career_plan_short || '未填'}】→ 中期【${candidate.career_plan_mid || '未填'}】→ 長期【${candidate.career_plan_long || '未填'}】
-- 人生夢想：${candidate.dream || '未填'}
+        - 職涯規劃：短期【${candidate.career_plan_short || '未填'}】→ 中期【${candidate.career_plan_mid || '未填'}】→ 長期【${candidate.career_plan_long || '未填'}】
+        - 人生夢想：${candidate.dream || '未填'}
 
-**工作經歷（共 ${(workExperiences || []).length} 筆）：**
-${workExpSection || '  （無工作經歷）'}
+** 工作經歷（共 ${(workExperiences || []).length} 筆）：**
+            ${workExpSection || '  （無工作經歷）'}
 
 ${candidate.resume_text ? `**外部履歷原文（104 / 紙本掃描上傳）：**
 > ⚠️ 以下是候選人親自上傳的完整履歷，請優先以此為工作經歷的依據，深度分析其中的項目與成就：
 
 \`\`\`
 ${candidate.resume_text.substring(0, 4000)}${candidate.resume_text.length > 4000 ? '\n\n[... 文件過長，已截取前段 ...]' : ''}
-\`\`\`` : '**外部履歷：** 未上傳'}
+\`\`\`` : '**外部履歷：** 未上傳'
+            }
 
-**嘉樂 FPA 四色性格測驗：**
-${fpaDesc}
+** 嘉樂 FPA 四色性格測驗：**
+            ${fpaDesc}
 
-**專業職能問答（共 ${(answers || []).length} 題）：**
-${qaSection || '  （無問答資料）'}
+** 專業職能問答（共 ${(answers || []).length} 題）：**
+            ${qaSection || '  （無問答資料）'}
 
----
+        ---
 
 ## 【報告輸出要求】
 
@@ -96,10 +99,10 @@ ${qaSection || '  （無問答資料）'}
 **評分維度：**
 
 **① 🎯 職缺契合度（X/10）**
-（候選人的背景、技能、過往經歷是否與應徵職位高度匹配？）
+（候選人的背景、技能、過往經歷是否與【${candidate.jc_position || '該職缺'}】高度匹配？）
 
-**② 💼 業務專業能力（X/10）**
-（是否具備業務所需的談判、說服、客戶溝通能力？有無相關成功案例？）
+**② 💼 專業硬實力（X/10）**
+（是否具備該職位所需的核心技能、知識或經驗？有無相關成功案例或數據佐證？）
 
 **③ 🔥 工作動力與積極性（X/10）**
 （對這份工作的渴望程度、應徵動機是否真誠、能否長期投入？）
@@ -115,23 +118,15 @@ ${qaSection || '  （無問答資料）'}
 
 ---
 
-# 🎯 三、業務適職性深度分析
+# 🎯 三、適職性深度分析
 
-> 這是最重要的評估章節之一。請從以下 5 個角度深入分析候選人是否適合業務職位。每個角度必須引用具體的問答內容或履歷陳述作為佐證，不允許空泛描述。
+> 這是最重要的評估章節之一。請根據候選人應徵的職位【${candidate.jc_position || '該職缺'}】，**挑選出 4 到 5 個該職位最不可或缺的核心能力或特質**（例如：若是會計，須著重「細緻度、數字敏感度、合規性」；若是工程師，須著重「邏輯思維、解題能力」；若是業務，著重「抗壓性、陌生開發」等），並逐一提出深度分析。
 
-**① 客戶導向思維**
-（從答案中找出候選人是否有「以客戶需求為出發點」的思維，而非只關注自己的業績目標）
+對每一個你挑選出的核心能力，請包含：
+**[該核心能力名稱]**
+（深入分析候選人在此項能力的表現，必須引用具體的問答內容、履歷陳述或 FPA 測驗性格做為佐證，不允許空泛描述。）
 
-**② 抗拒挫折能力（Rejection Resilience）**
-（當客戶說不、當業績壓力大時，候選人如何應對？從離職原因、抗壓性描述中尋找線索）
-
-**③ 主動開拓能力**
-（候選人是靠公司給名單，還是有能力自己開發客源？有沒有主動積極的業績故事？）
-
-**④ 成交驅動力**
-（候選人對業績數字的敏感度如何？有沒有談到具體業績、KPI、超標案例？）
-
-**⑤ 綜合業務適職性結論**
+**綜合適職性結論：**
 （給出明確結論：「高度適合」/ 「適合但需輔導」/ 「建議謹慎考量」，並說明主要理由）
 
 ---
@@ -168,14 +163,14 @@ ${qaSection || '  （無問答資料）'}
 
 > 根據四色測驗結果，深度解讀這個人的工作風格，必須包含：
 
-**① 主導色彩解讀與工作表現預測**
-（最高分顏色代表其最自然的行為模式，預期在工作中的表現形式）
+**① 主導色彩解讀與預測**
+（最高分顏色代表其最自然的行為模式，預期在【${candidate.jc_position || '該職缺'}】中的日常表現形式）
 
 **② 色彩組合帶來的複合特質**
-（兩種以上高分顏色的組合會產生什麼樣的人格特質？這對業務工作有什麼影響？）
+（兩種以上高分顏色的組合會產生什麼樣的人格特質？這對【${candidate.jc_position || '該職缺'}】有什麼加分或扣分影響？）
 
 **③ 低分色彩的潛在盲點**
-（哪個顏色分數最低？這代表他在哪方面可能表現弱勢？在業務工作中如何補強？）
+（哪個顏色分數最低？這代表他在哪方面可能表現弱勢？針對其應徵的職務該如何補強？）
 
 **④ CRI 真實度解讀**
 （${personality?.cri_score ?? 0}/10 的 CRI 分數代表什麼？候選人對自己的認知是否客觀？作答是否可能有「裝扮」傾向？）
@@ -214,9 +209,26 @@ ${qaSection || '  （無問答資料）'}
 `;
 
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
+        let responseText = '';
+        const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'];
+        let lastError = null;
+
+        for (const modelName of modelsToTry) {
+            try {
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const result = await model.generateContent(prompt);
+                responseText = result.response.text();
+                console.log(`[AI Report] Generated using model: ${modelName}`);
+                break; // Success
+            } catch (err) {
+                console.warn(`[AI Report] Model ${modelName} failed: ${err.message}`);
+                lastError = err;
+            }
+        }
+
+        if (!responseText) {
+            throw new Error(`所有模型均生成失敗。最後一個錯誤：${lastError?.message || '未知錯誤'}`);
+        }
 
         await CandidateRepo.saveAiReport(candidateId, responseText);
         console.log(`[AI Report] Successfully generated for candidate ${candidateId}`);

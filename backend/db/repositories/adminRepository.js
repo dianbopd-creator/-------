@@ -43,13 +43,13 @@ exports.findUserById = (id) => {
 };
 
 exports.getAllUsers = () => {
-    return all(`SELECT id, username, role, created_at FROM admin_users ORDER BY created_at DESC`);
+    return all(`SELECT id, username, role, full_name, department, position, is_active, permissions_json, created_at FROM admin_users WHERE is_active = 1 ORDER BY created_at DESC`);
 };
 
-exports.createUser = (username, passwordHash, role) => {
+exports.createUser = (username, passwordHash, role, permissions = []) => {
     return run(
-        `INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, ?)`,
-        [username, passwordHash, role]
+        `INSERT INTO admin_users (username, password_hash, role, permissions_json) VALUES (?, ?, ?, ?)`,
+        [username, passwordHash, role, JSON.stringify(permissions)]
     );
 };
 
@@ -67,6 +67,14 @@ exports.updateUserRole = (id, role) => {
     return run(`UPDATE admin_users SET role = ? WHERE id = ?`, [role, id]);
 };
 
+exports.updateUserPermissions = (id, permissions) => {
+    return run(`UPDATE admin_users SET permissions_json = ? WHERE id = ?`, [JSON.stringify(permissions), id]);
+};
+
+exports.updateUserRoleAndPermissions = (id, role, permissions) => {
+    return run(`UPDATE admin_users SET role = ?, permissions_json = ? WHERE id = ?`, [role, JSON.stringify(permissions), id]);
+};
+
 exports.updateProfile = (id, { full_name, email, avatar_b64, department, position }) => {
     return run(
         `UPDATE admin_users SET full_name = ?, email = ?, avatar_b64 = ?, department = ?, position = ? WHERE id = ?`,
@@ -75,7 +83,7 @@ exports.updateProfile = (id, { full_name, email, avatar_b64, department, positio
 };
 
 exports.deleteUser = (id) => {
-    return run(`DELETE FROM admin_users WHERE id = ?`, [id]);
+    return run(`UPDATE admin_users SET is_active = 0 WHERE id = ?`, [id]);
 };
 
 // ── 2FA (TOTP) ────────────────────────────────────────────────────────────────

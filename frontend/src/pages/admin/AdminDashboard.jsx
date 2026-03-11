@@ -1,21 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Search, Loader2, Eye, GripVertical, FileSpreadsheet, Plus, Edit, Trash2, Save, X, Library, CheckSquare, Square } from 'lucide-react';
 import { formatDate, daysSince, todayDateString } from '../../utils/dateUtils';
+import { useCandidates, useCategories } from '../../hooks/useApi';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    const [candidates, setCandidates] = useState([]);
-    const [categories, setCategories] = useState([]);
+    const { candidates, isLoading: cLoading, isError: cError, mutateCandidates } = useCandidates();
+    const { categories, isLoading: catLoading, mutateCategories } = useCategories();
+
+    const loading = cLoading || catLoading;
+    const error = cError ? cError.message : null;
+
     const [selectedCategoryId, setSelectedCategoryId] = useState('');
     const [isEditingStages, setIsEditingStages] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
 
     // Job Category Management State
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -56,36 +58,7 @@ const AdminDashboard = () => {
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
-    const fetchData = async () => {
-        try {
-            const [candRes, catRes] = await Promise.all([
-                fetch(`${apiUrl}/admin/candidates`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` },
-                    cache: 'no-store'
-                }),
-                fetch(`${apiUrl}/categories`, {
-                    cache: 'no-store'
-                })
-            ]);
 
-            if (!candRes.ok || !catRes.ok) throw new Error('Failed to fetch data');
-
-            const candData = await candRes.json();
-            const catData = await catRes.json();
-
-            setCandidates(candData.data || []);
-            setCategories(catData.data || []);
-
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchData();
-    }, []);
 
     const handleDragStart = (e, candidateId) => {
         e.dataTransfer.setData('text/plain', candidateId.toString());
@@ -104,7 +77,7 @@ const AdminDashboard = () => {
         const updatedCandidates = candidates.map(c =>
             c.id.toString() === candidateId ? { ...c, status: targetStage, job_category_id: selectedCategoryId ? parseInt(selectedCategoryId, 10) : c.job_category_id } : c
         );
-        setCandidates(updatedCandidates);
+        mutateCandidates(updatedCandidates, false);
 
         try {
             const bodyPayload = { status: targetStage };
@@ -124,9 +97,9 @@ const AdminDashboard = () => {
             if (!response.ok) {
                 throw new Error('Failed to update status');
             }
-            fetchData(); // Hard sync with DB to ensure category switching doesn't use stale array
+            mutateCandidates(); // Hard sync with DB
         } catch (err) {
-            fetchData();
+            mutateCandidates();
             alert(err.message);
         }
     };
@@ -139,7 +112,7 @@ const AdminDashboard = () => {
         const updatedCandidates = candidates.map(c =>
             c.id.toString() === candidateId ? { ...c, status: '待處理', job_category_id: null } : c
         );
-        setCandidates(updatedCandidates);
+        mutateCandidates(updatedCandidates, false);
 
         try {
             const bodyPayload = { status: '待處理', job_category_id: null };
@@ -155,9 +128,9 @@ const AdminDashboard = () => {
             if (!response.ok) {
                 throw new Error('Failed to revert status');
             }
-            fetchData();
+            mutateCandidates();
         } catch (err) {
-            fetchData();
+            mutateCandidates();
             alert(err.message);
         }
     };
@@ -245,7 +218,8 @@ const AdminDashboard = () => {
 
             setIsCategoryModalOpen(false);
             setIsEditingStages(false);
-            fetchData();
+            mutateCategories();
+            mutateCandidates();
         } catch (err) {
             alert(err.message);
         }
@@ -262,7 +236,8 @@ const AdminDashboard = () => {
             if (!response.ok) throw new Error(data.error);
 
             if (selectedCategoryId === id.toString()) setSelectedCategoryId('');
-            fetchData();
+            mutateCategories();
+            mutateCandidates();
         } catch (err) {
             alert(err.message);
         }
@@ -350,7 +325,8 @@ const AdminDashboard = () => {
             }
 
             setIsEditingStages(false);
-            fetchData();
+            mutateCategories();
+            mutateCandidates();
         } catch (err) {
             alert(err.message);
         }
@@ -601,7 +577,7 @@ const AdminDashboard = () => {
             {/* ══ STAGE EDITOR — FULL-SCREEN MODAL ══ */}
             {isEditingStages && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(9,27,49,0.55)', backdropFilter: 'blur(6px)', zIndex: 2000, display: 'flex', alignItems: 'stretch', justifyContent: 'center', padding: '2rem' }}
-                    onClick={e => { if (e.target === e.currentTarget) { setIsEditingStages(false); setModalTab('stages'); fetchData(); } }}>
+                    onClick={e => { if (e.target === e.currentTarget) { setIsEditingStages(false); setModalTab('stages'); } }}>
                     <div style={{ background: '#f8fafc', borderRadius: '20px', width: '100%', maxWidth: '900px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 32px 80px rgba(9,27,49,0.25)' }}>
 
                         {/* Modal Header */}
@@ -612,7 +588,7 @@ const AdminDashboard = () => {
                                     {formData.department} — {formData.position || '新增職缺'}
                                 </h2>
                             </div>
-                            <button onClick={() => { setIsEditingStages(false); setModalTab('stages'); fetchData(); }} style={{ background: 'rgba(15,23,42,0.06)', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-structural)', transition: 'all 0.15s' }}
+                            <button onClick={() => { setIsEditingStages(false); setModalTab('stages'); }} style={{ background: 'rgba(15,23,42,0.06)', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-structural)', transition: 'all 0.15s' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(15,23,42,0.12)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'rgba(15,23,42,0.06)'}>
                                 <X size={18} />
@@ -866,7 +842,7 @@ const AdminDashboard = () => {
                                 )}
                             </div>
                             <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                <button onClick={() => { setIsEditingStages(false); setModalTab('stages'); fetchData(); }} className="btn-secondary" style={{ padding: '0.6rem 1.2rem' }}>取消</button>
+                                <button onClick={() => { setIsEditingStages(false); setModalTab('stages'); }} className="btn-secondary" style={{ padding: '0.6rem 1.2rem' }}>取消</button>
                                 <button onClick={handleSaveStages} style={{ background: 'var(--color-primary)', color: '#fff', border: 'none', padding: '0.6rem 1.5rem', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '0.9rem', transition: 'all 0.2s' }}
                                     onMouseEnter={e => e.currentTarget.style.opacity = '0.88'}
                                     onMouseLeave={e => e.currentTarget.style.opacity = '1'}>

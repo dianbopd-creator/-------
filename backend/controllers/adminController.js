@@ -17,6 +17,10 @@ exports.login = async (req, res) => {
         const user = await AdminRepo.findUserByUsername(username);
         if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
+        if (user.is_active === 0) {
+            return res.status(403).json({ error: '此帳號已被停用或刪除' });
+        }
+
         const match = await bcrypt.compare(password, user.password_hash);
         if (!match) return res.status(401).json({ error: 'Invalid credentials' });
 
@@ -58,8 +62,10 @@ exports.login = async (req, res) => {
 
 exports.getCandidates = async (req, res) => {
     try {
-        const rows = await CandidateRepo.findAll();
-        const tagsMap = await TagRepo.getAllCandidateTagsMap();
+        const [rows, tagsMap] = await Promise.all([
+            CandidateRepo.findAll(),
+            TagRepo.getAllCandidateTagsMap()
+        ]);
         const mappedRows = rows.map(r => {
             if (r.jc_department) r.department = r.jc_department;
             if (r.jc_position) r.position = r.jc_position;

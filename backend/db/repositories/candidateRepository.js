@@ -155,12 +155,20 @@ exports.getWorkExperiencesByCandidate = (candidateId) => {
     return all(`SELECT * FROM work_experiences WHERE candidate_id = ? ORDER BY id ASC`, [candidateId]);
 };
 
-exports.saveResumeText = (candidateId, resumeText) => {
+exports.saveResumeText = (candidateId, resumeText, fileName = null, fileB64 = null) => {
+    if (fileB64) {
+        return run(`UPDATE candidates SET resume_text = ?, resume_file_name = ?, resume_file_b64 = ? WHERE id = ?`,
+            [resumeText, fileName, fileB64, candidateId]);
+    }
     return run(`UPDATE candidates SET resume_text = ? WHERE id = ?`, [resumeText, candidateId]);
 };
 
+exports.getResumeB64 = (candidateId) => {
+    return get(`SELECT resume_file_name, resume_file_b64 FROM candidates WHERE id = ?`, [candidateId]);
+};
+
 exports.deleteResumeText = (candidateId) => {
-    return run(`UPDATE candidates SET resume_text = NULL WHERE id = ?`, [candidateId]);
+    return run(`UPDATE candidates SET resume_text = NULL, resume_file_name = NULL, resume_file_b64 = NULL WHERE id = ?`, [candidateId]);
 };
 
 exports.deleteCandidate = async (candidateId) => {

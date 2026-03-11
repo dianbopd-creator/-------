@@ -54,11 +54,11 @@ exports.deleteCategory = async (req, res) => {
     const { id } = req.params;
 
     try {
-        const { count } = await JobCategoryRepo.getCandidateCount(id);
-        if (count > 0) {
-            return res.status(400).json({ error: 'Cannot delete this category because there are candidates associated with it.' });
-        }
+        // Step 1: Nullify job_category_id on all candidates in this category
+        // (preserves candidate data, just unlinks them from the deleted category)
+        await JobCategoryRepo.nullifyCandidates(id);
 
+        // Step 2: Delete linked questions + the category itself
         const result = await JobCategoryRepo.deleteById(id);
         if (result.changes === 0) return res.status(404).json({ error: 'Category not found' });
 

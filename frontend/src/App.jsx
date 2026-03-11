@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
@@ -18,11 +18,22 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import ResumeManagement from './pages/admin/ResumeManagement';
 import CandidateDetail from './pages/admin/CandidateDetail';
 import SecuritySettings from './pages/admin/SecuritySettings';
-import AnalyticsDashboard from './pages/admin/AnalyticsDashboard';
+
 import QuestionBank from './pages/admin/QuestionBank';
 import './index.css';
 
+// ── Serverless Keep-Alive: Ping the backend to prevent Vercel cold starts ──
+const PING_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/ping`;
+
 function App() {
+  useEffect(() => {
+    // Warm up the backend function immediately on app load
+    const ping = () => fetch(PING_URL, { method: 'GET' }).catch(() => { });
+    ping();
+    // Keep it warm every 5 minutes while the user has the app open
+    const interval = setInterval(ping, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
   return (
     <AuthProvider>
       <Router>
@@ -79,7 +90,7 @@ function App() {
             <Route element={<AdminLayout />}>
               <Route path="/admin/resumes" element={<ResumeManagement />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/analytics" element={<AnalyticsDashboard />} />
+
               <Route path="/admin/question-bank" element={<QuestionBank />} />
               <Route path="/admin/candidates/:id" element={<CandidateDetail />} />
               <Route path="/admin/security" element={<SecuritySettings />} />

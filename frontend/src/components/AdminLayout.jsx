@@ -67,7 +67,7 @@ const AdminLayout = () => {
             items: [
                 { label: '履歷總管', path: '/admin/resumes', icon: FileText },
                 { label: '甄試看板', path: '/admin/dashboard', icon: Activity },
-                { label: '數據洞察', path: '/admin/analytics', icon: BarChart2 },
+
                 { label: '題庫中心', path: '/admin/question-bank', icon: Library },
             ]
         },

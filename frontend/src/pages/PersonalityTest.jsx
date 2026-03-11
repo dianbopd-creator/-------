@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check } from 'lucide-react';
+import { Check, BrainCircuit, ChevronRight, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import { QuestionPicker } from '../utils/colortest_picker';
 
@@ -10,6 +10,9 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 const PersonalityTest = () => {
     const navigate = useNavigate();
     const candidateId = sessionStorage.getItem('candidateId');
+
+    // Intro screen: show before first question
+    const [showIntro, setShowIntro] = useState(true);
 
     // Test states
     const [questions, setQuestions] = useState([]);
@@ -92,9 +95,14 @@ const PersonalityTest = () => {
 
             if (!finalRes.ok) throw new Error('最終提交失敗');
 
-            // Clear sessionStorage and navigate to thank you
-            sessionStorage.removeItem('qa_draft_' + candidateId);
+            // ── Clear ALL candidate draft & session data after successful submission ──
+            // localStorage drafts (persist across tab close – must be explicitly removed)
+            localStorage.removeItem(`qa_draft_${candidateId}`);
+            localStorage.removeItem('basic_info_draft');
+            // sessionStorage session identifiers
             sessionStorage.removeItem('candidateId');
+            sessionStorage.removeItem('jobCategoryId');
+
             navigate('/thank-you');
         } catch (err) {
             console.error(err);
@@ -103,7 +111,74 @@ const PersonalityTest = () => {
         }
     };
 
-    if (questions.length === 0) return null; // Loading state
+    // ── Intro Screen ─────────────────────────────────────────────────────────
+    if (showIntro) {
+        return (
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', padding: '2rem' }}>
+                <motion.div
+                    initial={{ opacity: 0, y: 24 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+                    className="wizard-content"
+                    style={{ maxWidth: '640px', width: '100%', padding: '3rem', display: 'flex', flexDirection: 'column', gap: '2rem', alignItems: 'center', textAlign: 'center' }}
+                >
+                    {/* Icon */}
+                    <div style={{
+                        width: '80px', height: '80px', borderRadius: '24px',
+                        background: 'linear-gradient(135deg, var(--color-primary) 0%, #7c9ef5 100%)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 8px 32px rgba(99, 118, 234, 0.25)',
+                    }}>
+                        <BrainCircuit size={38} color="#fff" strokeWidth={1.5} />
+                    </div>
+
+                    {/* Title */}
+                    <div>
+                        <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.9rem', fontWeight: '800', color: 'var(--color-structural)', margin: '0 0 0.6rem' }}>
+                            性格色彩鑑定
+                        </h2>
+                        <p style={{ fontSize: '0.95rem', color: 'var(--color-structural-light)', margin: 0, letterSpacing: '0.02em' }}>
+                            PERSONALITY SPECTRUM ASSESSMENT
+                        </p>
+                    </div>
+
+                    {/* Description */}
+                    <div style={{ background: '#f8fafc', border: '1px solid var(--border-structural)', borderRadius: '16px', padding: '1.75rem 2rem', textAlign: 'left' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
+                            <Sparkles size={16} color="var(--color-primary)" />
+                            <span style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--color-primary)' }}>作答說明</span>
+                        </div>
+                        <p style={{ fontSize: '0.97rem', lineHeight: '1.85', color: 'var(--color-structural)', margin: '0 0 1rem' }}>
+                            接下來有 <strong>30 道情境題</strong>，每道題有四個選項。
+                        </p>
+                        <p style={{ fontSize: '0.97rem', lineHeight: '1.85', color: 'var(--color-structural)', margin: '0 0 1rem' }}>
+                            這不是考試，<strong>沒有「正確」或「錯誤」的答案</strong>。請依照您的<strong>第一直覺</strong>，選擇最符合真實的您的選項。
+                        </p>
+                        <p style={{ fontSize: '0.97rem', lineHeight: '1.85', color: 'var(--color-structural)', margin: '0' }}>
+                            過多思考或符合「理想形象」的作答，反而無法讓我們看見真實的您。請放鬆心情，享受這個過程。
+                        </p>
+                    </div>
+
+                    {/* Copyright / note */}
+                    <p style={{ fontSize: '0.8rem', color: 'rgba(15,23,42,0.35)', margin: '-0.5rem 0 0' }}>
+                        測驗結果僅供本次招募內部評估使用
+                    </p>
+
+                    {/* CTA */}
+                    <button
+                        onClick={() => { setShowIntro(false); setQuestionStartTime(Date.now()); }}
+                        className="btn-wizard btn-wizard-next"
+                        style={{ width: '100%', justifyContent: 'center', padding: '1.1rem 2rem', fontSize: '1.05rem', fontWeight: '700', letterSpacing: '0.02em' }}
+                    >
+                        準備好了，開始測驗 <ChevronRight size={20} />
+                    </button>
+                </motion.div>
+            </div>
+        );
+    }
+
+    // ── Loading guard (questions not yet initialised) ──────────────────────────
+    if (questions.length === 0) return null;
 
     const currentQuestion = questions[currentIndex];
     const progressPercentage = ((currentIndex) / 30) * 100;

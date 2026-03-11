@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * CandidateLayout — wraps every candidate-facing wizard page.
@@ -6,6 +7,7 @@ import React from 'react';
  * - Full-viewport column layout
  * - Sticky branded header with logo
  * - Step progress indicator in the header
+ * - Framer Motion page transitions (fade + slide) keyed by step
  */
 const CandidateLayout = ({ children, step = 1 }) => {
     const steps = [
@@ -82,9 +84,24 @@ const CandidateLayout = ({ children, step = 1 }) => {
                 <div style={{ width: '180px' }} />
             </header>
 
-            {/* ── Page Body (top padding = header height) ── */}
-            <main style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem 4rem', paddingTop: '80px' }}>
-                {children}
+            {/* ── Page Body — AnimatePresence for smooth step transitions ── */}
+            <main style={{
+                flex: 1, display: 'flex', alignItems: 'flex-start',
+                justifyContent: 'center', padding: '2rem 1rem 4rem',
+                paddingTop: '80px', overflow: 'hidden',
+            }}>
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={step}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+                        style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+                    >
+                        {children}
+                    </motion.div>
+                </AnimatePresence>
             </main>
         </div>
     );

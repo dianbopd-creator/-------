@@ -55,9 +55,20 @@ exports.update = (id, department, position, stagesArr, detailsObj) => {
     );
 };
 
-exports.deleteById = (id) => {
+exports.nullifyCandidates = (jobCategoryId) => {
+    return run(`UPDATE candidates SET job_category_id = NULL WHERE job_category_id = ?`, [jobCategoryId]);
+};
+
+exports.deleteById = async (id) => {
+
+    // Explicitly delete child job_questions rows first to avoid FK constraint
+    // failures on Supabase instances where CASCADE may not be set on the
+    // existing table (schema init runs CREATE TABLE IF NOT EXISTS, so old tables
+    // keep their original constraint definition).
+    await run(`DELETE FROM job_questions WHERE job_category_id = ?`, [id]);
     return run(`DELETE FROM job_categories WHERE id = ?`, [id]);
 };
+
 
 exports.getCandidateCount = (jobCategoryId) => {
     return get(`SELECT COUNT(*) as count FROM candidates WHERE job_category_id = ?`, [jobCategoryId]);

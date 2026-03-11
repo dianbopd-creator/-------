@@ -1,53 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search, Filter, UserCircle, Briefcase, Calendar, ChevronRight, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '../../utils/dateUtils';
+import { useCandidates, useCategories, useTags } from '../../hooks/useApi';
 
 const ResumeManagement = () => {
     const navigate = useNavigate();
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
-    const [candidates, setCandidates] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [allTags, setAllTags] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const { candidates, isLoading: cLoading, isError: cError, mutateCandidates } = useCandidates();
+    const { categories, isLoading: catLoading } = useCategories();
+    const { tags: allTags, isLoading: tLoading } = useTags();
+
+    const loading = cLoading || catLoading || tLoading;
+    const error = cError ? cError.message : '';
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [jobFilter, setJobFilter] = useState('ALL');
     const [selectedTagFilters, setSelectedTagFilters] = useState([]);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
-
-    useEffect(() => { fetchData(); }, []);
-
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const token = localStorage.getItem('adminToken');
-            const [candRes, catRes, tagRes] = await Promise.all([
-                fetch(`${apiUrl}/admin/candidates`, { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' }),
-                fetch(`${apiUrl}/categories`, { cache: 'no-store' }),
-                fetch(`${apiUrl}/admin/tags`, { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' })
-            ]);
-            if (!candRes.ok) throw new Error('無法載入履歷資料');
-            const candData = await candRes.json();
-
-            let catData = { data: [] };
-            if (catRes.ok) catData = await catRes.json();
-
-            let tData = { data: [] };
-            if (tagRes && tagRes.ok) tData = await tagRes.json();
-
-            setCandidates(candData.data || []);
-            setCategories(catData.data || []);
-            setAllTags(tData.data || []);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleDeleteCandidate = async (e, candidateId, candidateName) => {
         e.stopPropagation();
@@ -59,7 +31,7 @@ const ResumeManagement = () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!res.ok) { const j = await res.json(); throw new Error(j.error || '刪除失敗'); }
-            setCandidates(prev => prev.filter(c => c.id !== candidateId));
+            mutateCandidates(candidates.filter(c => c.id !== candidateId), { revalidate: true });
         } catch (err) {
             alert('錯誤：' + err.message);
         }

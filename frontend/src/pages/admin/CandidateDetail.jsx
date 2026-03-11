@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import questionsData from '../../data/questions.json';
 import InterviewScoreForm from '../../components/InterviewScoreForm';
+import { useCandidate, useComments, useTags } from '../../hooks/useApi';
 
 // Static fallback map from bundled questions.json (old alphanumeric codes)
 const STATIC_QUESTION_MAP = questionsData.reduce((acc, cat) => {
@@ -60,23 +61,26 @@ const CandidateDetail = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
 
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+    const authHeaders = { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` };
+
+    const { data: candBody, isLoading: candLoading, isError: candError, mutateCandidate } = useCandidate(id);
+    const { comments, isLoading: commLoading, mutateComments } = useComments(id);
+    const { tags: allTags, mutateTags } = useTags();
+
+    const data = candBody && candBody.candidate ? candBody : null;
+    const loading = candLoading || commLoading;
+    const error = candError ? candError.message : null;
+
     const [aiGenerating, setAiGenerating] = useState(false);
     const [activeTab, setActiveTab] = useState('candidate'); // 'candidate' | 'hr'
 
-    const [allTags, setAllTags] = useState([]);
     const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
     const [newTagName, setNewTagName] = useState('');
 
-    const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [commenting, setCommenting] = useState(false);
     const [uploadState, setUploadState] = useState({ loading: false, error: '', success: '' });
-
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
-    const authHeaders = { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` };
 
     // Merged question map: static json (old codes) + DB questions (new integer IDs)
     const [questionMap, setQuestionMap] = useState(STATIC_QUESTION_MAP);
@@ -95,22 +99,7 @@ const CandidateDetail = () => {
             .catch(() => { });
     }, []);
 
-    const fetchComments = useCallback(async () => {
-        try {
-            const res = await fetch(`${apiUrl}/admin/candidates/${id}/comments`, { headers: authHeaders });
-            if (res.ok) setComments(await res.json());
-        } catch { /* silently fail for comments */ }
-    }, [id]);
-
-    const fetchTags = useCallback(async () => {
-        try {
-            const res = await fetch(`${apiUrl}/admin/tags`, { headers: authHeaders });
-            if (res.ok) {
-                const body = await res.json();
-                setAllTags(body.data || []);
-            }
-        } catch { }
-    }, []);
+    // Removed fetchComments, fetchTags, fetchData
 
     const handleCreateTag = async (e) => {
         if (e) e.preventDefault();
@@ -126,7 +115,7 @@ const CandidateDetail = () => {
             });
             if (res.ok) {
                 setNewTagName('');
-                fetchTags();
+                mutateTags();
             } else {
                 const j = await res.json();
                 alert(j.error || '建立標籤失敗');
@@ -135,20 +124,7 @@ const CandidateDetail = () => {
     };
 
 
-    const fetchData = async () => {
-        try {
-            const response = await fetch(`${apiUrl}/admin/candidates/${id}`, { headers: authHeaders });
-            if (!response.ok) throw new Error('Failed to fetch candidate details');
-            const result = await response.json();
-            setData(result);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
 
-    useEffect(() => { fetchData(); fetchComments(); fetchTags(); }, [id]);
 
     const handleToggleCandidateTag = async (tagId, isCurrentlySelected) => {
         try {
@@ -163,7 +139,7 @@ const CandidateDetail = () => {
                 body: JSON.stringify({ tagIds: newTagIds })
             });
             if (!res.ok) throw new Error('標籤更新失敗');
-            fetchData();
+            mutateCandidate();
         } catch (err) {
             alert(err.message);
         }
@@ -182,7 +158,7 @@ const CandidateDetail = () => {
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || '上傳失敗');
             setUploadState({ loading: false, error: '', success: `✅ 已成功解析 ${json.length?.toLocaleString()} 字的履歷內容` });
-            fetchData();
+            mutateCandidate();
         } catch (err) {
             setUploadState({ loading: false, error: err.message, success: '' });
         }
@@ -199,7 +175,7 @@ const CandidateDetail = () => {
             });
             if (!res.ok) throw new Error('Failed to add comment');
             setNewComment('');
-            fetchComments();
+            mutateComments();
         } catch (err) { alert(err.message); }
         finally { setCommenting(false); }
     };
@@ -211,7 +187,7 @@ const CandidateDetail = () => {
                 method: 'DELETE', headers: authHeaders
             });
             if (!res.ok) { const e = await res.json(); throw new Error(e.error || '刪除失敗'); }
-            fetchComments();
+            mutateComments();
         } catch (err) { alert(err.message); }
     };
 
@@ -224,7 +200,7 @@ const CandidateDetail = () => {
                 method: 'POST', headers: authHeaders
             });
             if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
-            await fetchData();
+            await mutateCandidate();
         } catch (err) { alert('錯誤: ' + err.message); }
         finally { setAiGenerating(false); }
     };
@@ -236,7 +212,7 @@ const CandidateDetail = () => {
                 method: 'DELETE', headers: authHeaders
             });
             if (!res.ok) { const e = await res.json(); throw new Error(e.error || '刪除失敗'); }
-            fetchData();
+            mutateCandidate();
         } catch (err) { alert('錯誤: ' + err.message); }
     };
 
@@ -245,60 +221,137 @@ const CandidateDetail = () => {
         const { candidate, answers, personality, aiReport, workExperiences } = data;
 
         const workExpHtml = (workExperiences || []).length > 0
-            ? workExperiences.map((exp, i) => `<div style="margin-bottom:1em;padding:0.8em;border-left:4px solid #091b31;background:#f8fafc;border-radius:0 8px 8px 0;"><strong>${exp.job_title || '未知職稱'}</strong> <span style="color:#64748b;font-size:9pt">${exp.years || ''}</span><br/>${exp.achievements || ''}</div>`).join('')
-            : '<p>無工作經歷資料</p>';
+            ? workExperiences.map((exp, i) => `<div class="card experience-card"><div class="exp-header"><strong>${exp.job_title || '未知職稱'}</strong> <span class="exp-years">${exp.years || ''}</span></div><div class="exp-achievements">${exp.achievements || ''}</div></div>`).join('')
+            : '<p class="empty-state">無工作經歷資料</p>';
 
         const qaHtml = (answers || []).map((a, i) =>
-            `<div style="margin-bottom:1.2em;"><div style="font-weight:bold;color:#18181b">Q${i + 1}. ${questionMap[a.question_code] || a.question_code}</div><div style="background:#f8fafc;padding:0.6em 0.9em;margin-top:0.4em;border-left:3px solid #091b31;white-space:pre-wrap;border-radius:0 8px 8px 0;">${a.answer_text || ''}</div></div>`
+            `<div class="card qa-card"><div class="qa-q"><span class="q-num">Q${i + 1}.</span> ${questionMap[a.question_code] || a.question_code}</div><div class="qa-a">${a.answer_text || ''}</div></div>`
         ).join('');
 
         const fpaHtml = personality
-            ? `<p>🔴 紅色 ${personality.red_score ?? 0}　🟡 黃色 ${personality.yellow_score ?? 0}　🟢 綠色 ${personality.green_score ?? 0}　🔵 藍色 ${personality.blue_score ?? 0}　⚡ CRI ${personality.cri_score ?? 0}/10</p>`
-            : '<p>尚未完成測驗</p>';
-
-        const resumeTextHtml = candidate.resume_text
-            ? candidate.resume_text
-                .replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                .split(/\n{2,}/)
-                .map(para => `<p style="margin:0 0 0.8em;line-height:1.75">${para.replace(/\n/g, '<br/>')}</p>`)
-                .join('')
-            : '<p style="color:#888">無外部上傳履歷</p>';
+            ? `<div class="fpa-grid">
+                <div class="fpa-item"><div class="fpa-score">${personality.red_score ?? 0}</div><div class="fpa-label">紅色</div></div>
+                <div class="fpa-item"><div class="fpa-score">${personality.yellow_score ?? 0}</div><div class="fpa-label">黃色</div></div>
+                <div class="fpa-item"><div class="fpa-score">${personality.green_score ?? 0}</div><div class="fpa-label">綠色</div></div>
+                <div class="fpa-item"><div class="fpa-score">${personality.blue_score ?? 0}</div><div class="fpa-label">藍色</div></div>
+                <div class="fpa-item"><div class="fpa-score">${personality.cri_score ?? 0}/10</div><div class="fpa-label">CRI 真實度</div></div>
+               </div>`
+            : '<p class="empty-state">尚未完成測驗</p>';
 
         const aiHtml = aiReport?.raw_analysis
             ? aiReport.raw_analysis
                 .replace(/^### (.+)$/gm, '<h3>$1</h3>')
                 .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-                .replace(/^# (.+)$/gm, '<h1 style="font-size:14pt;border-bottom:2px solid #091b31;padding-bottom:4px;margin-top:1.5em">$1</h1>')
+                .replace(/^# (.+)$/gm, '<h2>$1</h2>')
                 .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                .replace(/^> (.+)$/gm, '<blockquote style="border-left:3px solid #091b31;padding:0.3em 0.8em;margin:0.5em 0;background:#f8fafc;border-radius:0 8px 8px 0;">$1</blockquote>')
-                .replace(/^- (.+)$/gm, '<li>$1</li>')
+                .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+                .replace(/^- (.+)$/gm, '<li><span>•</span> $1</li>')
                 .replace(/\n\n/g, '</p><p>')
-            : '<p style="color:#888">AI 尚未產生分析報告</p>';
+            : '<p class="empty-state">AI 尚未產生分析報告</p>';
 
         const win = window.open('', '_blank');
         win.document.write(`<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>${candidate.name} - 評鑑報告</title>
-<style>@page{size:A4;margin:1.5cm}body{font-family:'Inter',sans-serif;font-size:10pt;color:#18181b;line-height:1.7}h1{font-size:15pt;border-bottom:2px solid #091b31;padding-bottom:4px;margin-top:1.5em}h2{font-size:12pt;margin-top:1.2em}h3{font-size:10.5pt;color:#1e3a8a;margin-top:1em}section{border:1px solid #e2e8f0;padding:1em;margin-bottom:1.2em;page-break-inside:avoid;border-radius:12px;}.title{font-size:20pt;font-weight:bold;margin:0}.sub{color:#64748b;font-size:9pt;margin:0 0 1.5em 0}blockquote{border-left:3px solid #091b31;padding:0.3em 0.8em;margin:0.4em 0;background:#f8fafc;border-radius:0 8px 8px 0;}strong{color:#1e3a8a}p{margin:0 0 0.6em}</style></head>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Inter:wght@400;600;700&display=swap');
+@page { size: A4; margin: 12mm 15mm; }
+body { font-family: 'Inter', 'Noto Sans TC', sans-serif; font-size: 10.5pt; color: #000; line-height: 1.5; margin: 0; padding: 0; background: #fff; }
+.header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 16px; }
+.header h1 { font-size: 22pt; font-weight: 700; color: #000; margin: 0 0 4px 0; letter-spacing: 2px; }
+.header .meta { font-size: 10pt; color: #333; font-weight: 500; display: inline-flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.header .badge { background: #fff; padding: 2px 8px; border-radius: 4px; color: #000; border: 1px solid #ccc; }
+section { margin-bottom: 20px; page-break-inside: auto; }
+h2.section-title { font-size: 12pt; color: #000; border-bottom: 1px solid #999; padding-bottom: 4px; margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.info-box { background: #fff; border: 1px solid #ccc; padding: 6px 10px; border-radius: 4px; }
+.info-label { font-size: 8.5pt; color: #555; font-weight: 600; margin-bottom: 2px; text-transform: uppercase; }
+.info-value { font-size: 10pt; color: #000; font-weight: 500; }
+.card { background: #fff; border: 1px solid #ccc; border-left: 4px solid #666; padding: 10px 12px; border-radius: 4px; margin-bottom: 10px; page-break-inside: avoid; }
+.exp-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.exp-header strong { font-size: 11pt; color: #000; }
+.exp-years { font-size: 9pt; color: #333; background: #eee; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+.exp-achievements { font-size: 9.5pt; color: #222; line-height: 1.5; white-space: pre-wrap; }
+.qa-card { border-left-color: #666; }
+.qa-q { font-weight: 700; color: #000; margin-bottom: 6px; font-size: 10.5pt; }
+.q-num { color: #555; margin-right: 4px; font-weight: bold; }
+.qa-a { color: #222; white-space: pre-wrap; background: #fafafa; border: 1px solid #eee; padding: 8px 10px; border-radius: 4px; font-size: 9.5pt; }
+.fpa-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; text-align: center; margin-bottom: 10px; }
+.fpa-item { background: #fff; border: 1px solid #ccc; border-top: 3px solid #666; padding: 10px 4px; border-radius: 4px; page-break-inside: avoid; }
+.fpa-score { font-size: 16pt; font-weight: 700; color: #000; font-family: 'Inter', sans-serif; line-height: 1; margin-bottom: 4px; }
+.fpa-label { font-size: 8.5pt; color: #333; font-weight: 600; }
+.ai-report { background: #fff; border: 1px solid #ccc; padding: 16px; border-radius: 4px; color: #000; }
+.ai-report h2 { font-size: 12pt; color: #000; margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid #ccc; }
+.ai-report h3 { font-size: 10.5pt; color: #000; margin: 12px 0 6px 0; }
+.ai-report p { margin: 0 0 8px 0; }
+.ai-report ul { margin: 0 0 10px 0; padding-left: 20px; }
+.ai-report li { margin-bottom: 4px; }
+.ai-report strong { color: #000; font-weight: bold; }
+.ai-report blockquote { border-left: 3px solid #666; background: #fafafa; padding: 6px 10px; margin: 10px 0; border-radius: 0 4px 4px 0; font-style: italic; color: #333; }
+.empty-state { color: #666; font-size: 9.5pt; font-style: italic; text-align: center; padding: 10px; }
+.page-footer { text-align: center; font-size: 8pt; color: #666; margin-top: 30px; border-top: 1px dashed #ccc; padding-top: 8px; }
+</style></head>
 <body>
-<p class="title">${candidate.name}</p>
-<p class="sub">應徵：${candidate.department || ''} - ${candidate.position || ''}　|　狀態：${candidate.status || '待處理'}　|　電話：${candidate.phone || ''}</p>
+<div class="header">
+    <h1>${candidate.name}</h1>
+    <div class="meta">
+        <span class="badge">應徵：${candidate.department || ''} - ${candidate.position || ''}</span>
+        <span class="badge">狀態：${candidate.status || '待處理'}</span>
+        <span class="badge">電話：${candidate.phone || '-'}</span>
+    </div>
+</div>
 
-<section><h2>📋 基本資料</h2>
-<p>學歷：${candidate.education_school || ''} ${candidate.education_major || ''}　|　駕照：${candidate.driving_license || '無'}</p>
-<p>目前薪資：${candidate.current_salary_monthly || 'N/A'} / 月　|　期望薪資：${candidate.expected_salary_monthly || 'N/A'} / 月</p>
-<p>離職原因：${candidate.leave_reason || '未填'}</p>
-<p>應徵動機：${candidate.motivation || '未填'}</p>
-<p>職涯規劃：${candidate.career_plan_short || '-'} → ${candidate.career_plan_mid || '-'} → ${candidate.career_plan_long || '-'}</p>
+<section>
+    <h2>📋 基本與期望條件</h2>
+    <div class="grid-2">
+        <div class="info-box"><div class="info-label">聯絡電話</div><div class="info-value">${candidate.phone || '-'}</div></div>
+        <div class="info-box"><div class="info-label">出生日期</div><div class="info-value">${candidate.birth_date || '-'}</div></div>
+        <div class="info-box"><div class="info-label">最高學歷</div><div class="info-value">${candidate.education_school || '-'} ${candidate.education_major ? `(${candidate.education_major})` : ''}</div></div>
+        <div class="info-box"><div class="info-label">駕照</div><div class="info-value">${candidate.driving_license || '無'}</div></div>
+        <div class="info-box"><div class="info-label">目前薪資</div><div class="info-value">月 ${candidate.current_salary_monthly || 'N/A'} / 年 ${candidate.current_salary_annual || 'N/A'}</div></div>
+        <div class="info-box"><div class="info-label">期望薪資</div><div class="info-value">月 ${candidate.expected_salary_monthly || 'N/A'} / 年 ${candidate.expected_salary_annual || 'N/A'}</div></div>
+    </div>
 </section>
 
-<section><h2>📎 外部上傳履歷（制式履歷原文）</h2>${resumeTextHtml}</section>
+<section>
+    <h2>💡 動機與職涯規劃</h2>
+    <div class="grid-2" style="margin-bottom: 12px;">
+        <div class="info-box"><div class="info-label">離職原因</div><div class="info-value" style="white-space:pre-wrap;">${candidate.leave_reason || '-'}</div></div>
+        <div class="info-box"><div class="info-label">應徵動機</div><div class="info-value" style="white-space:pre-wrap;">${candidate.motivation || '-'}</div></div>
+    </div>
+    <div class="info-box" style="margin-bottom: 12px;">
+        <div class="info-label">人生夢想</div>
+        <div class="info-value" style="white-space:pre-wrap;">${candidate.dream || '-'}</div>
+    </div>
+    <div class="grid-3">
+        <div class="info-box"><div class="info-label">1年內短程目標</div><div class="info-value">${candidate.career_plan_short || '-'}</div></div>
+        <div class="info-box"><div class="info-label">3~5年中程目標</div><div class="info-value">${candidate.career_plan_mid || '-'}</div></div>
+        <div class="info-box"><div class="info-label">5年後長程目標</div><div class="info-value">${candidate.career_plan_long || '-'}</div></div>
+    </div>
+</section>
 
-<section><h2>💼 工作經歷</h2>${workExpHtml}</section>
+<section>
+    <h2>💼 工作經歷</h2>
+    ${workExpHtml}
+</section>
 
-<section><h2>📝 問答紀錄</h2>${qaHtml}</section>
+<section>
+    <h2>📝 專業問答紀錄</h2>
+    ${qaHtml}
+</section>
 
-<section><h2>🧬 FPA 性格測驗</h2>${fpaHtml}</section>
+<section>
+    <h2>🧬 嘉樂 FPA 性格測驗結果</h2>
+    ${fpaHtml}
+</section>
 
-<section><h2>🤖 AI 人才評鑑報告</h2>${aiHtml}</section>
+<section>
+    <h2>🤖 AI 人才深度評鑑報告</h2>
+    <div class="ai-report"><p>${aiHtml}</p></div>
+</section>
+
+<div class="page-footer">
+    列印時間：${new Date().toLocaleString('zh-TW')} | 嘉樂醫療系統
+</div>
 </body></html>`);
         win.document.close();
         setTimeout(() => win.print(), 400);
@@ -535,37 +588,77 @@ const CandidateDetail = () => {
 
             {/* ══════════════ TAB: 104履歷 ══════════════ */}
             {activeTab === 'resume104' && (
-                <div className="wizard-content" style={{ minHeight: 'auto', padding: '1.5rem' }}>
-                    <h2 style={{ fontSize: '1.4rem', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--color-structural)', fontFamily: 'var(--font-heading)', borderBottom: '2px solid rgba(45,34,28,0.08)', paddingBottom: '0.9rem' }}>
-                        <FileUp size={22} color="var(--color-primary)" /> 104履歷原件
-                        <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'rgba(45,34,28,0.35)', fontFamily: 'var(--font-tech)' }}>重新上傳可更新履歷；支援 PDF / Word</span>
-                    </h2>
-                    {candidate.resume_text ? (
-                        <iframe
-                            key={id}
-                            src={`${apiUrl}/admin/candidates/${id}/resume-file?t=${Date.now()}`}
-                            title="104履歷"
-                            style={{
-                                width: '100%',
-                                height: '85vh',
-                                border: '1px solid rgba(45,34,28,0.12)',
-                                borderRadius: '6px',
-                                background: '#fff'
-                            }}
-                        />
-                    ) : (
-                        <div style={{ padding: '4rem', textAlign: 'center', color: 'rgba(45,34,28,0.4)', fontFamily: 'var(--font-tech)', border: '2px dashed rgba(45,34,28,0.15)', borderRadius: '8px' }}>
-                            <FileUp size={40} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                            <div style={{ fontWeight: 'bold', marginBottom: '0.4rem' }}>尚未上傳 104 履歷</div>
-                            <div style={{ fontSize: '0.82rem' }}>請在「候選人資料 → HR 評估中心」的履歷上傳區塊上傳 PDF 或 Word</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div className="wizard-content" style={{ minHeight: 'auto', padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid rgba(45,34,28,0.08)', paddingBottom: '0.9rem', marginBottom: '1rem' }}>
+                            <h2 style={{ fontSize: '1.4rem', margin: '0', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--color-structural)', fontFamily: 'var(--font-heading)' }}>
+                                <FileUp size={22} color="var(--color-primary)" /> 104履歷原件
+                            </h2>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <button
+                                    onClick={() => document.getElementById(`resume-hr-${id}`).click()}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '0.5rem 1.2rem',
+                                        background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '6px',
+                                        fontSize: '0.9rem', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s',
+                                        boxShadow: '0 4px 12px rgba(228,179,89,0.2)'
+                                    }}
+                                >
+                                    <Upload size={16} /> 上傳 PDF/Word 履歷
+                                </button>
+                                <input id={`resume-hr-${id}`} type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }} onChange={e => { const f = e.target.files[0]; if (f) handleResumeUpload(f); e.target.value = ''; }} />
+                            </div>
                         </div>
-                    )}
+
+                        {(uploadState.loading || uploadState.success || uploadState.error || candidate.resume_text) && (
+                            <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {uploadState.loading && <div style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Loader2 size={18} className="animate-spin" /> 解析中...</div>}
+                                {uploadState.success && <div style={{ fontSize: '0.85rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(21,128,61,0.05)', padding: '6px 12px', borderRadius: '4px' }}><CheckCircle size={14} /> {uploadState.success}</div>}
+                                {uploadState.error && <div style={{ fontSize: '0.85rem', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(220,38,38,0.05)', padding: '6px 12px', borderRadius: '4px' }}><XCircle size={14} /> {uploadState.error}</div>}
+                                {candidate.resume_text && !uploadState.loading && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '4px 10px', background: 'rgba(15,23,42,0.03)', border: '1px solid rgba(15,23,42,0.1)', borderRadius: '4px', fontSize: '0.85rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', color: 'var(--color-structural)' }}><CheckCircle size={14} color="#15803d" /> 已儲存文字：{candidate.resume_text.length.toLocaleString()} 字</div>
+                                        <button
+                                            onClick={handleDeleteResume}
+                                            title="刪除此份履歷"
+                                            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 8px', border: '1px solid rgba(220,38,38,0.35)', borderRadius: '4px', background: 'rgba(220,38,38,0.06)', color: '#dc2626', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', transition: 'all 0.15s' }}
+                                        >
+                                            <Trash2 size={12} /> 清除
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {candidate.resume_text ? (
+                            <iframe
+                                key={id}
+                                src={`${apiUrl}/admin/candidates/${id}/resume-file?t=${Date.now()}`}
+                                title="104履歷"
+                                style={{
+                                    width: '100%',
+                                    height: '85vh',
+                                    border: '1px solid rgba(45,34,28,0.12)',
+                                    borderRadius: '6px',
+                                    background: '#fff'
+                                }}
+                            />
+                        ) : (
+                            <div style={{ padding: '4rem', textAlign: 'center', color: 'rgba(45,34,28,0.4)', fontFamily: 'var(--font-tech)', border: '2px dashed rgba(45,34,28,0.15)', borderRadius: '8px' }}>
+                                <FileUp size={40} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                                <div style={{ fontWeight: 'bold', marginBottom: '0.4rem' }}>尚未上傳 104 履歷</div>
+                                <div style={{ fontSize: '0.82rem' }}>請在右側區塊上傳檔案</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 右側欄已整合至上方 */}
                 </div>
             )}
 
             {/* ══════════════ TAB: AI 履歷解析 ══════════════ */}
             {activeTab === 'ai' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 400px', gap: '2rem', alignItems: 'start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
                     {/* ── Left: AI Report ── */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -628,49 +721,7 @@ const CandidateDetail = () => {
                     {/* ── Right Sidebar: HR Tools ── */}
                     <div style={{ position: 'sticky', top: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-                        {/* Resume Upload */}
-                        <div className="wizard-content" style={{ minHeight: 'auto', padding: '1.4rem' }}>
-                            <h3 style={{ fontSize: '0.88rem', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-structural)', fontFamily: 'var(--font-tech)', letterSpacing: '0.5px' }}>
-                                <FileUp size={16} color="var(--color-primary)" /> // 外部履歷上傳（PDF / Word）
-                            </h3>
-                            <div
-                                style={{ border: '2px dashed var(--border-structural)', borderRadius: '8px', padding: '1.2rem', textAlign: 'center', background: 'rgba(228,179,89,0.02)', cursor: 'pointer', transition: 'all 0.2s' }}
-                                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
-                                onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border-structural)'; }}
-                                onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border-structural)'; const f = e.dataTransfer.files[0]; if (f) handleResumeUpload(f); }}
-                                onClick={() => document.getElementById(`resume-hr-${id}`).click()}
-                            >
-                                <input id={`resume-hr-${id}`} type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }} onChange={e => { const f = e.target.files[0]; if (f) handleResumeUpload(f); e.target.value = ''; }} />
-                                {uploadState.loading ? (
-                                    <div style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}><Loader2 size={18} className="animate-spin" /> 解析中...</div>
-                                ) : (
-                                    <div style={{ color: 'rgba(45,34,28,0.5)', fontSize: '0.85rem' }}>
-                                        <Upload size={22} style={{ margin: '0 auto 0.4rem' }} />
-                                        <div style={{ fontWeight: 'bold', color: 'var(--color-structural)', marginBottom: '0.2rem' }}>點擊或拖曳檔案</div>
-                                        <div style={{ fontSize: '0.75rem' }}>上傳後自動納入 AI 評估</div>
-                                    </div>
-                                )}
-                            </div>
-                            {uploadState.success && <div style={{ marginTop: '0.6rem', fontSize: '0.8rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle size={13} /> {uploadState.success}</div>}
-                            {uploadState.error && <div style={{ marginTop: '0.6rem', fontSize: '0.8rem', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px' }}><XCircle size={13} /> {uploadState.error}</div>}
-                            {candidate.resume_text && (
-                                <div style={{ marginTop: '0.75rem', padding: '0.55rem 0.8rem', background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '6px', fontSize: '0.8rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', color: '#15803d' }}><CheckCircle size={12} /> 已上傳：{candidate.resume_text.length.toLocaleString()} 字元</div>
-                                        <button
-                                            onClick={handleDeleteResume}
-                                            title="刪除此份履歷"
-                                            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', border: '1px solid rgba(220,38,38,0.35)', borderRadius: '4px', background: 'rgba(220,38,38,0.06)', color: '#dc2626', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 'bold', transition: 'all 0.15s' }}
-                                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.14)'; }}
-                                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.06)'; }}
-                                        >
-                                            <Trash2 size={11} /> 刪除
-                                        </button>
-                                    </div>
-                                    <div style={{ color: 'rgba(45,34,28,0.45)', fontSize: '0.72rem', marginTop: '2px' }}>重新上傳可覆蓋更新</div>
-                                </div>
-                            )}
-                        </div>
+                        {/* hr tab layout without resume upload */}
                     </div>
                 </div>
             )}

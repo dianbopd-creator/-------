@@ -13,84 +13,94 @@ const commentController = require('../controllers/commentController');
 const tagController = require('../controllers/tagController');
 const analyticsController = require('../controllers/analyticsController');
 const questionController = require('../controllers/questionController');
-const { verifyToken, requireMinimumRole } = require('../middleware/authMiddleware');
+const { verifyToken } = require('../middleware/authMiddleware');
+const requirePermission = require('../middleware/requirePermission');
 
-// --- Public API for Candidates ---
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC API (候選人填寫表單)
+// ─────────────────────────────────────────────────────────────────────────────
 router.post('/candidates', candidateController.createCandidate);
 router.post('/candidates/:id/answers', candidateController.submitAnswers);
 router.post('/candidates/:id/personality', candidateController.submitPersonality);
 router.post('/candidates/:id/submit', candidateController.finalSubmit);
 router.get('/categories', jobCategoryController.getCategories);
-// Public endpoint so the QA page can fetch job-specific questions
 router.get('/jobs/:jobId/questions', questionController.getQuestionsForJob);
 
-// --- Admin Auth API ---
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC ADMIN AUTH
+// ─────────────────────────────────────────────────────────────────────────────
 router.post('/admin/login', adminController.login);
-router.post('/admin/login/2fa', twoFactorController.verifyLogin); // Public: step 2 of login
-
-// --- Resume file (public, for iframe embedding) ---
+router.post('/admin/login/2fa', twoFactorController.verifyLogin);
 router.get('/admin/candidates/:id/resume-file', resumeController.getResumeFile);
 
-// --- Protected Admin API (Requires valid JWT) ---
+// ─────────────────────────────────────────────────────────────────────────────
+// PROTECTED: 所有 /admin 路由都需要先驗證 JWT Token
+// ─────────────────────────────────────────────────────────────────────────────
 router.use('/admin', verifyToken);
 
-// Tags
+// ── 個人帳號 (任何登入帳號都可用) ──────────────────────────────────────────
+router.get('/admin/2fa/status', twoFactorController.getStatus);
+router.post('/admin/2fa/setup', twoFactorController.setup);
+router.post('/admin/2fa/enable', twoFactorController.enable);
+router.post('/admin/2fa/disable', twoFactorController.disable);
+router.put('/admin/me/password', usersController.changePassword);
+router.put('/admin/me/profile', usersController.updateProfile);
+
+// ── 標籤 (讀取全開；新增/修改/刪除需要 manage_tags) ──────────────────────
 router.get('/admin/tags', tagController.getAllTags);
-router.post('/admin/tags', tagController.createTag);
-router.put('/admin/tags/:id', tagController.updateTag);
-router.delete('/admin/tags/:id', tagController.deleteTag);
+router.post('/admin/tags', requirePermission('manage_tags'), tagController.createTag);
+router.put('/admin/tags/:id', requirePermission('manage_tags'), tagController.updateTag);
+router.delete('/admin/tags/:id', requirePermission('manage_tags'), tagController.deleteTag);
 
-// Candidates
-router.get('/admin/candidates', adminController.getCandidates);
-router.get('/admin/analytics/dashboard', analyticsController.getDashboardAnalytics);
-router.get('/admin/candidates/:id', adminController.getCandidateById);
-router.put('/admin/candidates/batch-status', adminController.batchUpdateCandidateStatus);
-router.put('/admin/candidates/:id/status', adminController.updateCandidateStatus);
-router.delete('/admin/candidates/:id', adminController.deleteCandidate);
-router.post('/admin/candidates/:id/evaluations', adminController.addEvaluation);
-router.get('/admin/candidates/:id/export', adminController.exportPDF);
-router.post('/admin/candidates/:id/analyze', adminController.analyzeCandidate);
-router.post('/admin/candidates/:id/resume-upload', resumeController.uploadMiddleware, resumeController.uploadResume);
-router.delete('/admin/candidates/:id/resume', resumeController.deleteResume);
-router.get('/admin/candidates/:id/interview-score', interviewController.getInterviewScore);
-router.post('/admin/candidates/:id/interview-score', interviewController.saveInterviewScore);
-router.get('/admin/candidates/:id/comments', commentController.getComments);
-router.post('/admin/candidates/:id/comments', commentController.addComment);
-router.delete('/admin/candidates/:id/comments/:commentId', commentController.removeComment);
-router.get('/admin/candidates/:id/tags', tagController.getCandidateTags);
-router.put('/admin/candidates/:id/tags', tagController.setCandidateTags);
+// ── 履歷總覽 (需要 view_resumes) ────────────────────────────────────────────
+router.get('/admin/candidates', requirePermission('view_resumes'), adminController.getCandidates);
+router.get('/admin/analytics/dashboard', requirePermission('view_resumes'), analyticsController.getDashboardAnalytics);
+router.get('/admin/candidates/:id', requirePermission('view_resumes'), adminController.getCandidateById);
+router.get('/admin/candidates/:id/interview-score', requirePermission('view_resumes'), interviewController.getInterviewScore);
+router.get('/admin/candidates/:id/comments', requirePermission('view_resumes'), commentController.getComments);
+router.get('/admin/candidates/:id/tags', requirePermission('view_resumes'), tagController.getCandidateTags);
 
-// Question Bank
-router.get('/admin/questions', questionController.getAllQuestions);
-router.post('/admin/questions', questionController.createQuestion);
-router.put('/admin/questions/:id', questionController.updateQuestion);
-router.delete('/admin/questions/:id', questionController.deleteQuestion);
-router.get('/admin/jobs/:jobId/questions', questionController.getQuestionsForJob);
-router.put('/admin/jobs/:jobId/questions', questionController.setQuestionsForJob);
+// ── 履歷狀態異動 (需要 change_status) ───────────────────────────────────────
+router.put('/admin/candidates/batch-status', requirePermission('change_status'), adminController.batchUpdateCandidateStatus);
+router.put('/admin/candidates/:id/status', requirePermission('change_status'), adminController.updateCandidateStatus);
 
-// --- Protected Current User API ---
-router.put('/admin/me/password', verifyToken, usersController.changePassword);
-router.put('/admin/me/profile', verifyToken, usersController.updateProfile);
+// ── 評分與 AI 分析 (需要 edit_resumes) ──────────────────────────────────────
+router.post('/admin/candidates/:id/evaluations', requirePermission('edit_resumes'), adminController.addEvaluation);
+router.post('/admin/candidates/:id/analyze', requirePermission('edit_resumes'), adminController.analyzeCandidate);
+router.post('/admin/candidates/:id/interview-score', requirePermission('edit_resumes'), interviewController.saveInterviewScore);
+router.post('/admin/candidates/:id/comments', requirePermission('edit_resumes'), commentController.addComment);
+router.delete('/admin/candidates/:id/comments/:commentId', requirePermission('edit_resumes'), commentController.removeComment);
+router.put('/admin/candidates/:id/tags', requirePermission('edit_resumes'), tagController.setCandidateTags);
+router.post('/admin/candidates/:id/resume-upload', requirePermission('edit_resumes'), resumeController.uploadMiddleware, resumeController.uploadResume);
+router.delete('/admin/candidates/:id/resume', requirePermission('edit_resumes'), resumeController.deleteResume);
 
-// --- Protected User Management API (Requires 'admin' role) ---
-router.use('/admin/users', verifyToken, requireMinimumRole('admin'));
-router.get('/admin/users', usersController.getUsers);
-router.post('/admin/users', usersController.createUser);
-router.put('/admin/users/:id', usersController.updateUser);
-router.delete('/admin/users/:id', usersController.deleteUser);
+// ── 刪除求職者 (需要 delete_resumes) ────────────────────────────────────────
+router.delete('/admin/candidates/:id', requirePermission('delete_resumes'), adminController.deleteCandidate);
 
-// --- Protected Job Categories Management API (Requires 'admin' role) ---
-router.post('/admin/job-categories', verifyToken, requireMinimumRole('admin'), jobCategoryController.createCategory);
-router.put('/admin/job-categories/:id', verifyToken, requireMinimumRole('admin'), jobCategoryController.updateCategory);
-router.delete('/admin/job-categories/:id', verifyToken, requireMinimumRole('admin'), jobCategoryController.deleteCategory);
+// ── 匯出 (需要 export_data) ──────────────────────────────────────────────────
+router.get('/admin/candidates/:id/export', requirePermission('export_data'), adminController.exportPDF);
 
-// --- Protected Audit Logs API (Requires 'admin' role) ---
-router.get('/admin/audit-logs', verifyToken, requireMinimumRole('admin'), auditLogController.getAuditLogs);
+// ── 題庫 (讀取需要 view_jobs；修改需要 manage_questions) ─────────────────────
+router.get('/admin/questions', requirePermission('view_jobs'), questionController.getAllQuestions);
+router.post('/admin/questions', requirePermission('manage_questions'), questionController.createQuestion);
+router.put('/admin/questions/:id', requirePermission('manage_questions'), questionController.updateQuestion);
+router.delete('/admin/questions/:id', requirePermission('manage_questions'), questionController.deleteQuestion);
+router.get('/admin/jobs/:jobId/questions', requirePermission('view_jobs'), questionController.getQuestionsForJob);
+router.put('/admin/jobs/:jobId/questions', requirePermission('manage_questions'), questionController.setQuestionsForJob);
 
-// --- 2FA (TOTP) API ---
-router.get('/admin/2fa/status', verifyToken, twoFactorController.getStatus); // Read 2FA status
-router.post('/admin/2fa/setup', verifyToken, twoFactorController.setup);     // Generate QR code
-router.post('/admin/2fa/enable', verifyToken, twoFactorController.enable);   // Confirm & enable
-router.post('/admin/2fa/disable', verifyToken, twoFactorController.disable); // Disable 2FA
+// ── 職缺分類 (讀取全開；修改需要 manage_jobs) ────────────────────────────────
+router.get('/admin/job-categories', jobCategoryController.getCategories);
+router.post('/admin/job-categories', requirePermission('manage_jobs'), jobCategoryController.createCategory);
+router.put('/admin/job-categories/:id', requirePermission('manage_jobs'), jobCategoryController.updateCategory);
+router.delete('/admin/job-categories/:id', requirePermission('manage_jobs'), jobCategoryController.deleteCategory);
+
+// ── 人員管理 (需要 manage_users) ─────────────────────────────────────────────
+router.get('/admin/users', requirePermission('manage_users'), usersController.getUsers);
+router.post('/admin/users', requirePermission('manage_users'), usersController.createUser);
+router.put('/admin/users/:id', requirePermission('manage_users'), usersController.updateUser);
+router.delete('/admin/users/:id', requirePermission('manage_users'), usersController.deleteUser);
+
+// ── 操作日誌 (需要 view_system) ──────────────────────────────────────────────
+router.get('/admin/audit-logs', requirePermission('view_system'), auditLogController.getAuditLogs);
 
 module.exports = router;

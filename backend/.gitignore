@@ -24,3 +24,4 @@ uploads/
 tmp/
 .vercel
 .env*.local
+

@@ -54,7 +54,11 @@ const AdminLayout = () => {
 
     if (!user) return <Navigate to="/admin/login" replace />;
 
-    const isAdmin = user.role === 'admin' || user.role === 'superadmin';
+    const isSuperAdmin = user.role === 'superadmin';
+    // 直接從 AuthContext 的 user 物件取得 permissions (login 時後端已回傳)
+    const userPerms = Array.isArray(user.permissions) ? user.permissions : [];
+    const hasPerm = (p) => isSuperAdmin || userPerms.includes(p);
+
 
     // ── Mandatory 2FA gate ──────────────────────────────────────────────────
     // If user hasn't enabled 2FA, block access until they set it up
@@ -65,17 +69,16 @@ const AdminLayout = () => {
         {
             label: '招募管理',
             items: [
-                { label: '履歷總管', path: '/admin/resumes', icon: FileText },
-                { label: '甄試看板', path: '/admin/dashboard', icon: Activity },
-
-                { label: '題庫中心', path: '/admin/question-bank', icon: Library },
+                ...(hasPerm('view_resumes') ? [{ label: '履歷總管', path: '/admin/resumes', icon: FileText }] : []),
+                ...(hasPerm('view_resumes') ? [{ label: '甄試看板', path: '/admin/dashboard', icon: Activity }] : []),
+                ...(hasPerm('view_jobs') ? [{ label: '題庫中心', path: '/admin/question-bank', icon: Library }] : []),
             ]
         },
-        ...(isAdmin ? [{
+        ...((hasPerm('manage_users') || hasPerm('view_system')) ? [{
             label: '系統設定',
             items: [
-                { label: '人員管理', path: '/admin/users', icon: Users },
-                { label: '操作日誌', path: '/admin/audit-logs', icon: ClipboardList },
+                ...(hasPerm('manage_users') ? [{ label: '人員管理', path: '/admin/users', icon: Users }] : []),
+                ...(hasPerm('view_system') ? [{ label: '操作日誌', path: '/admin/audit-logs', icon: ClipboardList }] : []),
             ]
         }] : []),
         {

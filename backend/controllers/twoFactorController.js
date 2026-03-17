@@ -185,7 +185,10 @@ exports.verifyLogin = async (req, res) => {
                 id: user.id, username: user.username, role: user.role,
                 full_name: user.full_name, avatar_b64: user.avatar_b64,
                 department: user.department, position: user.position,
-                totp_enabled: true // always true if verifyLogin succeeded
+                totp_enabled: true,
+                permissions: (() => {
+                    try { return JSON.parse(user.permissions_json || '[]'); } catch { return []; }
+                })()
             }
         });
     } catch (err) {

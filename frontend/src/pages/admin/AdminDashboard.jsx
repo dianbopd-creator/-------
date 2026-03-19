@@ -346,116 +346,151 @@ const AdminDashboard = () => {
         const allStagesFlat = parsedPhases.flatMap(p => p.stages);
 
         return (
-            <div style={{ display: 'flex', gap: '1rem', flex: 1, minHeight: 0, overflowX: 'auto', paddingBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0', flex: 1, minHeight: 0, overflowX: 'auto', paddingBottom: '0.5rem', alignItems: 'stretch' }}>
                 {parsedPhases.map((phase, phaseIndex) => {
                     const colors = PHASE_COLORS[phaseIndex] || PHASE_COLORS[3];
-                    const phaseCount = phase.stages.reduce((acc, stage) => {
-                        return acc + categoryCandidates.filter(c => c.status === stage || (!c.status && allStagesFlat.indexOf(stage) === 0)).length;
-                    }, 0);
+                    return phase.stages.map((stage, stageIndex) => {
+                        const isFirstInPhase = stageIndex === 0;
+                        const isLastInPhase = stageIndex === phase.stages.length - 1;
+                        const stageCandidates = categoryCandidates.filter(c =>
+                            c.status === stage || (!c.status && allStagesFlat.indexOf(stage) === 0)
+                        );
 
-                    return (
-                        <div key={phaseIndex} style={{
-                            flex: '1 1 0', minWidth: '240px', background: colors.bg,
-                            borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                            border: `1px solid ${colors.accent}22`
-                        }}>
-                            {/* Phase header */}
-                            <div style={{
-                                background: colors.headerBg, padding: '0.65rem 1rem',
-                                borderBottom: `2px solid ${colors.accent}33`, display: 'flex',
-                                alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
-                            }}>
-                                <span style={{ fontWeight: '800', fontSize: '0.9rem', color: colors.accent, fontFamily: 'var(--font-heading)' }}>{phase.name}</span>
-                                <span style={{ fontSize: '0.78rem', fontWeight: '700', background: `${colors.accent}22`, color: colors.accent, padding: '2px 10px', borderRadius: '9999px' }}>{phaseCount}</span>
-                            </div>
+                        return (
+                            <div
+                                key={`${phaseIndex}-${stageIndex}`}
+                                style={{
+                                    // Phase spacing: gap between phases, no gap within a phase
+                                    marginLeft: isFirstInPhase && phaseIndex > 0 ? '12px' : isFirstInPhase ? '0' : '2px',
+                                    flexShrink: 0,
+                                    width: '200px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    background: 'var(--bg-card)',
+                                    border: '1px solid var(--border-structural)',
+                                    borderRadius: isFirstInPhase && isLastInPhase ? '10px'
+                                        : isFirstInPhase ? '10px 0 0 10px'
+                                        : isLastInPhase ? '0 10px 10px 0'
+                                        : '0',
+                                    // merge inner borders
+                                    borderRight: !isLastInPhase ? 'none' : '1px solid var(--border-structural)',
+                                    overflow: 'hidden',
+                                }}
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, stage)}
+                            >
+                                {/* Color band — 6px accent strip showing phase */}
+                                <div style={{ height: '5px', background: colors.accent, flexShrink: 0 }} />
 
-                            {/* Sub-stages stacked vertically */}
-                            <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                {phase.stages.map((stage, stageIndex) => {
-                                    const stageCandidates = categoryCandidates.filter(c => c.status === stage || (!c.status && allStagesFlat.indexOf(stage) === 0));
-                                    return (
-                                        <div key={stageIndex}
-                                            onDragOver={handleDragOver}
-                                            onDrop={(e) => handleDrop(e, stage)}
-                                            style={{
-                                                background: 'rgba(255,255,255,0.65)',
-                                                borderRadius: '10px',
-                                                border: `1px solid ${colors.accent}30`,
-                                                overflow: 'hidden',
-                                            }}
-                                        >
-                                            {/* Sub-stage label row */}
-                                            <div style={{
-                                                padding: '0.5rem 0.85rem',
-                                                background: `${colors.accent}12`,
-                                                borderBottom: stageCandidates.length > 0 ? `1px solid ${colors.accent}25` : 'none',
-                                                display: 'flex', alignItems: 'center', gap: '8px'
-                                            }}>
-                                                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: colors.accent, flexShrink: 0 }} />
-                                                <span style={{ fontSize: '0.82rem', fontWeight: '700', color: colors.accent, flex: 1 }}>{stage}</span>
-                                                <span style={{ fontSize: '0.72rem', fontWeight: '700', color: colors.accent, background: `${colors.accent}20`, padding: '1px 8px', borderRadius: '9999px' }}>{stageCandidates.length}</span>
-                                            </div>
+                                {/* Phase label — only on first column of each phase */}
+                                <div style={{
+                                    height: '22px',
+                                    background: `${colors.accent}12`,
+                                    borderBottom: `1px solid ${colors.accent}22`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    paddingLeft: '0.75rem',
+                                    flexShrink: 0,
+                                }}>
+                                    {isFirstInPhase ? (
+                                        <span style={{ fontSize: '0.68rem', fontWeight: '800', color: colors.accent, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{phase.name}</span>
+                                    ) : (
+                                        <span style={{ fontSize: '0.65rem', color: `${colors.accent}60` }}>·</span>
+                                    )}
+                                </div>
 
-                                            {/* Cards drop zone */}
-                                            <div style={{ padding: stageCandidates.length > 0 ? '0.5rem' : '0', display: 'flex', flexDirection: 'column', gap: '0.4rem', minHeight: stageCandidates.length === 0 ? '40px' : 'auto' }}>
-                                                {stageCandidates.length === 0 ? (
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '40px', fontSize: '0.75rem', color: `${colors.accent}70`, fontStyle: 'italic' }}>
-                                                        拖曳至此
-                                                    </div>
-                                                ) : (
-                                                    stageCandidates.map(candidate => (
-                                                        <div key={candidate.id} draggable
-                                                            onDragStart={(e) => handleDragStart(e, candidate.id)}
-                                                            onDragOver={handleDragOver}
-                                                            onDrop={(e) => { e.stopPropagation(); handleDrop(e, stage); }}
-                                                            style={{
-                                                                background: 'white',
-                                                                padding: '0.7rem 0.85rem',
-                                                                borderRadius: '8px',
-                                                                border: `1px solid rgba(15,23,42,0.08)`,
-                                                                cursor: 'grab',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '8px',
-                                                                boxShadow: '0 1px 5px rgba(0,0,0,0.05)',
-                                                                transition: 'all 0.15s ease',
-                                                            }}
-                                                            onMouseEnter={e => {
-                                                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                                                e.currentTarget.style.boxShadow = `0 5px 15px ${colors.accent}25`;
-                                                                e.currentTarget.style.borderColor = `${colors.accent}50`;
-                                                            }}
-                                                            onMouseLeave={e => {
-                                                                e.currentTarget.style.transform = 'translateY(0)';
-                                                                e.currentTarget.style.boxShadow = '0 1px 5px rgba(0,0,0,0.05)';
-                                                                e.currentTarget.style.borderColor = 'rgba(15,23,42,0.08)';
-                                                            }}
-                                                        >
-                                                            <GripVertical size={13} style={{ color: 'rgba(15,23,42,0.2)', flexShrink: 0 }} />
-                                                            <span style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--color-structural)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{candidate.name}</span>
-                                                            <button
-                                                                onClick={() => navigate(`/admin/candidates/${candidate.id}`)}
-                                                                style={{ background: `${colors.accent}14`, border: 'none', cursor: 'pointer', color: colors.accent, padding: '4px 6px', borderRadius: '6px', flexShrink: 0, display: 'flex', alignItems: 'center' }}
-                                                                title="查看資料"
-                                                            >
-                                                                <Eye size={13} />
-                                                            </button>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
+                                {/* Sub-stage title */}
+                                <div style={{
+                                    padding: '0.6rem 0.8rem 0.5rem',
+                                    borderBottom: '1px solid var(--border-structural)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    flexShrink: 0,
+                                }}>
+                                    <span style={{ fontWeight: '700', fontSize: '0.88rem', color: 'var(--color-structural)', flex: 1 }}>{stage}</span>
+                                    <span style={{
+                                        fontSize: '0.72rem', fontWeight: '700',
+                                        background: stageCandidates.length > 0 ? `${colors.accent}18` : 'rgba(15,23,42,0.05)',
+                                        color: stageCandidates.length > 0 ? colors.accent : 'rgba(15,23,42,0.35)',
+                                        padding: '1px 7px', borderRadius: '9999px'
+                                    }}>{stageCandidates.length}</span>
+                                </div>
+
+                                {/* Cards */}
+                                <div style={{ flex: 1, overflowY: 'auto', padding: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                                    {stageCandidates.length === 0 ? (
+                                        <div style={{
+                                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            minHeight: '60px', fontSize: '0.75rem',
+                                            color: 'rgba(15,23,42,0.25)', fontStyle: 'italic',
+                                            border: `1.5px dashed ${colors.accent}30`,
+                                            borderRadius: '8px',
+                                        }}>
+                                            拖曳至此
                                         </div>
-                                    );
-                                })}
+                                    ) : (
+                                        stageCandidates.map(candidate => (
+                                            <div
+                                                key={candidate.id}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, candidate.id)}
+                                                onDragOver={handleDragOver}
+                                                onDrop={(e) => { e.stopPropagation(); handleDrop(e, stage); }}
+                                                style={{
+                                                    background: 'white',
+                                                    padding: '0.65rem 0.75rem',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid rgba(15,23,42,0.08)',
+                                                    cursor: 'grab',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                                                    transition: 'all 0.15s ease',
+                                                }}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                    e.currentTarget.style.boxShadow = `0 4px 14px ${colors.accent}28`;
+                                                    e.currentTarget.style.borderColor = `${colors.accent}50`;
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                    e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)';
+                                                    e.currentTarget.style.borderColor = 'rgba(15,23,42,0.08)';
+                                                }}
+                                            >
+                                                <GripVertical size={13} style={{ color: 'rgba(15,23,42,0.18)', flexShrink: 0 }} />
+                                                <span style={{
+                                                    fontWeight: '700', fontSize: '0.9rem',
+                                                    color: 'var(--color-structural)', flex: 1,
+                                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                                }}>{candidate.name}</span>
+                                                <button
+                                                    onClick={() => navigate(`/admin/candidates/${candidate.id}`)}
+                                                    style={{
+                                                        background: `${colors.accent}14`, border: 'none',
+                                                        cursor: 'pointer', color: colors.accent,
+                                                        padding: '4px 6px', borderRadius: '6px',
+                                                        flexShrink: 0, display: 'flex', alignItems: 'center'
+                                                    }}
+                                                    title="查看資料"
+                                                >
+                                                    <Eye size={13} />
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    );
+                        );
+                    });
                 })}
             </div>
         );
-    };
 
     // Show candidates in the pending pool if they have no kanban stage assigned yet.
+
     // A candidate is "pending" if:
     //   (a) they have no job_category_id assigned, OR
     //   (b) their status is not one of the kanban stages of their category

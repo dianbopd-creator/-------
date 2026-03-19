@@ -8,6 +8,13 @@ const Welcome = () => {
 
     const handleStart = () => {
         if (agreed) {
+            // Clear any leftover data from previous candidate before starting fresh
+            localStorage.removeItem('basic_info_draft');
+            localStorage.removeItem('qa_draft');
+            localStorage.removeItem('candidateId');
+            localStorage.removeItem('jobCategoryId');
+            sessionStorage.removeItem('candidateId');
+            sessionStorage.removeItem('jobCategoryId');
             navigate('/basic-info');
         }
     };

@@ -335,10 +335,10 @@ const AdminDashboard = () => {
     };
 
     const PHASE_COLORS = [
-        { bg: '#EAF6F6', accent: '#0d9488', headerBg: '#d0f0ee' },
-        { bg: '#EAF6DF', accent: '#65a30d', headerBg: '#d9f0c4' },
-        { bg: '#FCF6E3', accent: '#ca8a04', headerBg: '#f5e8b8' },
-        { bg: '#E8F4F8', accent: '#0369a1', headerBg: '#c8e4f0' },
+        { bg: '#FFF0F3', accent: '#e11d48', headerBg: '#ffe4eb' },   // 邀約面試 — 玫瑰紅
+        { bg: '#F3F0FF', accent: '#7c3aed', headerBg: '#ede9fe' },   // 現場面談 — 紫羅蘭
+        { bg: '#FFF7ED', accent: '#ea580c', headerBg: '#ffedd5' },   // 確認意願 — 橘橙
+        { bg: '#F0FDF4', accent: '#16a34a', headerBg: '#dcfce7' },   // 錄取作業 — 翠綠
     ];
 
     const renderKanban = () => {

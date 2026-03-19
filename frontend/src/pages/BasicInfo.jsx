@@ -192,6 +192,9 @@ const BasicInfo = () => {
                 const result = await response.json();
                 sessionStorage.setItem('candidateId', result.id);
                 if (data.job_category_id) sessionStorage.setItem('jobCategoryId', data.job_category_id);
+                // Also persist to localStorage so returning users don't lose QA progress
+                localStorage.setItem('candidateId', result.id);
+                if (data.job_category_id) localStorage.setItem('jobCategoryId', data.job_category_id);
                 localStorage.removeItem('basic_info_draft'); // Clear draft on success
                 navigate('/qa');
             }

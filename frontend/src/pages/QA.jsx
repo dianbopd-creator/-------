@@ -9,8 +9,9 @@ const QA = () => {
     const navigate = useNavigate();
     const contentRef = useRef(null);
 
-    const candidateId = sessionStorage.getItem('candidateId');
-    const jobCategoryId = sessionStorage.getItem('jobCategoryId'); // stored when BasicInfo completes
+    // Read from sessionStorage (current session) with localStorage fallback (returning users)
+    const candidateId = sessionStorage.getItem('candidateId') || localStorage.getItem('candidateId');
+    const jobCategoryId = sessionStorage.getItem('jobCategoryId') || localStorage.getItem('jobCategoryId');
 
     const [questions, setQuestions] = useState([]);
     const [loadingQuestions, setLoadingQuestions] = useState(true);
@@ -133,6 +134,8 @@ const QA = () => {
 
             if (response.ok) {
                 localStorage.removeItem('qa_draft');
+                localStorage.removeItem('candidateId');
+                localStorage.removeItem('jobCategoryId');
                 navigate('/personality');
             } else {
                 alert('提交失敗，請重試');

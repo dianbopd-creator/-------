@@ -51,8 +51,8 @@ const QA = () => {
 
                 setQuestions(data);
 
-                // Auto-restore draft silently
-                const draft = localStorage.getItem(`qa_draft_${candidateId}`);
+                // Auto-restore draft silently — use fixed key so data survives navigation
+                const draft = localStorage.getItem('qa_draft');
                 if (draft) {
                     try { setAnswers(JSON.parse(draft)); } catch { /* ignore */ }
                 }
@@ -66,12 +66,12 @@ const QA = () => {
         loadQuestions();
     }, [candidateId, jobCategoryId, navigate]);
 
-    // Auto-save draft
+    // Auto-save draft — fixed key so answers survive navigating back to BasicInfo
     useEffect(() => {
-        if (candidateId && Object.keys(answers).length > 0) {
-            localStorage.setItem(`qa_draft_${candidateId}`, JSON.stringify(answers));
+        if (Object.keys(answers).length > 0) {
+            localStorage.setItem('qa_draft', JSON.stringify(answers));
         }
-    }, [answers, candidateId]);
+    }, [answers]);
 
     // Scroll to top on step change
     useEffect(() => {
@@ -132,7 +132,7 @@ const QA = () => {
             });
 
             if (response.ok) {
-                localStorage.removeItem(`qa_draft_${candidateId}`);
+                localStorage.removeItem('qa_draft');
                 navigate('/personality');
             } else {
                 alert('提交失敗，請重試');
@@ -157,7 +157,13 @@ const QA = () => {
                 {/* Sidebar */}
                 <aside className="wizard-sidebar">
                     <div className="sidebar-global-progress">
-                        <div className="global-step completed" style={{ cursor: 'pointer' }} onClick={() => navigate('/basic-info')} title="點擊返回基本資料">
+                        <div className="global-step completed" style={{ cursor: 'pointer' }} onClick={() => {
+                            // Persist answers before leaving so they survive navigation
+                            if (Object.keys(answers).length > 0) {
+                                localStorage.setItem('qa_draft', JSON.stringify(answers));
+                            }
+                            navigate('/basic-info');
+                        }} title="點擊返回基本資料">
                             <span className="global-step-num"><Check size={16} /></span>
                             <span className="global-step-title" style={{ opacity: 0.7 }}>基本資料</span>
                         </div>

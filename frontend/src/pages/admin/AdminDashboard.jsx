@@ -171,6 +171,7 @@ const AdminDashboard = () => {
         try {
             const res = await fetch(`${apiUrl}/admin/questions`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` } });
             if (res.ok) { const j = await res.json(); setAllQuestions(j.data || []); }
+        // eslint-disable-next-line no-empty
         } catch { }
     };
 
@@ -488,6 +489,7 @@ const AdminDashboard = () => {
                 })}
             </div>
         );
+    };
 
     // Show candidates in the pending pool if they have no kanban stage assigned yet.
 
@@ -503,7 +505,6 @@ const AdminDashboard = () => {
     });
 
     const pendingCandidates = candidates.filter(c => {
-        const status = (c.status || '').toLowerCase();
         const hasNoCategory = !c.job_category_id;
         const isInKanban = KANBAN_STAGE_STATUSES.includes(c.status);
         const isMatchSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());

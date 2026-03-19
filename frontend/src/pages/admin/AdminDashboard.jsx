@@ -18,6 +18,7 @@ const AdminDashboard = () => {
     const [selectedCategoryId, setSelectedCategoryId] = useState('');
     const [isEditingStages, setIsEditingStages] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isPendingOpen, setIsPendingOpen] = useState(true);
 
     // Job Category Management State
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -332,78 +333,104 @@ const AdminDashboard = () => {
         }
     };
 
+    const PHASE_COLORS = [
+        { bg: '#EAF6F6', accent: '#0d9488', headerBg: '#d0f0ee' },
+        { bg: '#EAF6DF', accent: '#65a30d', headerBg: '#d9f0c4' },
+        { bg: '#FCF6E3', accent: '#ca8a04', headerBg: '#f5e8b8' },
+        { bg: '#E8F4F8', accent: '#0369a1', headerBg: '#c8e4f0' },
+    ];
+
     const renderKanban = () => {
         if (!selectedCategory) return null;
         const parsedPhases = parseStages(selectedCategory.stages);
+        const allStagesFlat = parsedPhases.flatMap(p => p.stages);
 
         return (
-            <div style={{ display: 'flex', gap: '1rem', flex: 1, minHeight: 0, overflowX: 'auto', paddingBottom: '1rem' }}>
-                {parsedPhases.map((phase, phaseIndex) => (
-                    phase.stages.map((stage, stageIndex) => {
-                        const allStagesFlat = parsedPhases.flatMap(p => p.stages);
-                        const stageCandidates = categoryCandidates.filter(c => c.status === stage || (!c.status && allStagesFlat.indexOf(stage) === 0));
+            <div style={{ display: 'flex', gap: '1rem', flex: 1, minHeight: 0, overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                {parsedPhases.map((phase, phaseIndex) => {
+                    const colors = PHASE_COLORS[phaseIndex] || PHASE_COLORS[3];
+                    const phaseCount = phase.stages.reduce((acc, stage) => {
+                        return acc + categoryCandidates.filter(c => c.status === stage || (!c.status && allStagesFlat.indexOf(stage) === 0)).length;
+                    }, 0);
 
-                        return (
-                            <div key={`${phaseIndex}-${stageIndex}`} className="kanban-sub-stage-col"
-                                onDragOver={handleDragOver}
-                                onDrop={(e) => handleDrop(e, stage)}
-                                style={{ background: phaseIndex === 0 ? '#EAF6F6' : phaseIndex === 1 ? '#EAF6DF' : phaseIndex === 2 ? '#FCF6E3' : '#E8F4F8', padding: '1rem', borderRadius: '8px' }}
-                            >
-                                <div style={{ marginBottom: '0.8rem' }}>
-                                    <div style={{ fontSize: '0.78rem', color: 'rgba(24,24,27,0.45)', fontFamily: 'var(--font-heading)', marginBottom: '0.2rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{phase.name}</div>
-                                    <div className="kanban-sub-stage-header" style={{ marginBottom: '0.6rem', borderBottom: '2px solid rgba(15,23,42,0.08)', paddingBottom: '0.4rem' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--color-structural)' }}>{stage}</span>
-                                            <span style={{ marginLeft: 'auto', fontSize: '0.78rem', fontWeight: '600', color: 'var(--color-structural-light)', background: '#eff3f8', padding: '2px 8px', borderRadius: '9999px' }}>{stageCandidates.length}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', overflowY: 'auto', flex: 1, minHeight: '80px', paddingRight: '4px' }}>
-                                    {stageCandidates.length === 0 ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60px', fontSize: '0.8rem', color: 'rgba(24,24,27,0.35)', fontStyle: 'italic' }}>
-                                            此階段目前為空
-                                        </div>
-                                    ) : (
-                                        stageCandidates.map(candidate => (
-                                            <div key={candidate.id} draggable onDragStart={(e) => handleDragStart(e, candidate.id)}
-                                                onDragOver={handleDragOver}
-                                                onDrop={(e) => { e.stopPropagation(); handleDrop(e, stage); }}
-                                                style={{
-                                                    background: 'white', padding: '1rem', borderRadius: '10px',
-                                                    border: '1px solid rgba(15,23,42,0.08)', cursor: 'grab',
-                                                    display: 'flex', flexDirection: 'column', gap: '0.5rem',
-                                                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-                                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', position: 'relative'
-                                                }}
-                                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(9, 27, 49, 0.1)'; e.currentTarget.style.borderColor = 'rgba(15,23,42,0.2)'; }}
-                                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)'; e.currentTarget.style.borderColor = 'rgba(15,23,42,0.08)'; }}
-                                            >
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                                                        <div style={{ fontWeight: 'bold', fontSize: '0.95rem', color: 'var(--color-structural)' }}>
-                                                            {candidate.name}
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => navigate(`/admin/candidates/${candidate.id}`)}
-                                                        style={{ background: 'rgba(15, 23, 42, 0.05)', border: 'none', cursor: 'pointer', color: 'var(--color-structural)', padding: '5px', borderRadius: '6px' }}
-                                                        title="查看資料"
-                                                    >
-                                                        <Eye size={14} />
-                                                    </button>
-                                                </div>
-                                                <div style={{ fontSize: '0.78rem', color: 'var(--color-structural-light)', fontFamily: 'var(--font-tech)' }}>
-                                                    {candidate.department || '未指定部門'}
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
+                    return (
+                        <div key={phaseIndex} style={{
+                            flex: '1 1 0', minWidth: '260px', background: colors.bg,
+                            borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                            border: `1px solid ${colors.accent}22`
+                        }}>
+                            {/* Phase header */}
+                            <div style={{
+                                background: colors.headerBg, padding: '0.65rem 1rem',
+                                borderBottom: `2px solid ${colors.accent}33`, display: 'flex',
+                                alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
+                            }}>
+                                <span style={{ fontWeight: '800', fontSize: '0.9rem', color: colors.accent, fontFamily: 'var(--font-heading)' }}>{phase.name}</span>
+                                <span style={{ fontSize: '0.78rem', fontWeight: '700', background: `${colors.accent}22`, color: colors.accent, padding: '2px 10px', borderRadius: '9999px' }}>{phaseCount}</span>
                             </div>
-                        );
-                    })
-                ))}
+
+                            {/* Sub-stages inside the phase — scrollable horizontally */}
+                            <div style={{ flex: 1, overflow: 'auto', padding: '0.75rem', display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+                                {phase.stages.map((stage, stageIndex) => {
+                                    const stageCandidates = categoryCandidates.filter(c => c.status === stage || (!c.status && allStagesFlat.indexOf(stage) === 0));
+                                    return (
+                                        <div key={stageIndex}
+                                            onDragOver={handleDragOver}
+                                            onDrop={(e) => handleDrop(e, stage)}
+                                            style={{
+                                                flex: '1 1 0', minWidth: '160px', background: 'rgba(255,255,255,0.7)',
+                                                borderRadius: '8px', display: 'flex', flexDirection: 'column',
+                                                border: '1px solid rgba(255,255,255,0.9)'
+                                            }}
+                                        >
+                                            {/* Sub-stage header */}
+                                            <div style={{
+                                                padding: '0.45rem 0.65rem', borderBottom: `1px solid ${colors.accent}22`,
+                                                display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0
+                                            }}>
+                                                <span style={{ fontSize: '0.82rem', fontWeight: '700', color: colors.accent, flex: 1 }}>{stage}</span>
+                                                <span style={{ fontSize: '0.72rem', fontWeight: '600', color: colors.accent, background: `${colors.accent}18`, padding: '1px 6px', borderRadius: '9999px' }}>{stageCandidates.length}</span>
+                                            </div>
+
+                                            {/* Cards */}
+                                            <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', overflowY: 'auto', minHeight: '60px' }}>
+                                                {stageCandidates.length === 0 ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50px', fontSize: '0.75rem', color: 'rgba(24,24,27,0.3)', fontStyle: 'italic' }}>空</div>
+                                                ) : (
+                                                    stageCandidates.map(candidate => (
+                                                        <div key={candidate.id} draggable
+                                                            onDragStart={(e) => handleDragStart(e, candidate.id)}
+                                                            onDragOver={handleDragOver}
+                                                            onDrop={(e) => { e.stopPropagation(); handleDrop(e, stage); }}
+                                                            style={{
+                                                                background: 'white', padding: '0.55rem 0.65rem', borderRadius: '8px',
+                                                                border: '1px solid rgba(15,23,42,0.07)', cursor: 'grab',
+                                                                display: 'flex', alignItems: 'center', gap: '6px',
+                                                                boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                                                                transition: 'all 0.15s'
+                                                            }}
+                                                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = `0 4px 12px ${colors.accent}22`; e.currentTarget.style.borderColor = `${colors.accent}44`; }}
+                                                            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; e.currentTarget.style.borderColor = 'rgba(15,23,42,0.07)'; }}
+                                                        >
+                                                            <span style={{ fontWeight: '700', fontSize: '0.88rem', color: 'var(--color-structural)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{candidate.name}</span>
+                                                            <button
+                                                                onClick={() => navigate(`/admin/candidates/${candidate.id}`)}
+                                                                style={{ background: `${colors.accent}14`, border: 'none', cursor: 'pointer', color: colors.accent, padding: '4px', borderRadius: '5px', flexShrink: 0, display: 'flex', alignItems: 'center' }}
+                                                                title="查看資料"
+                                                            >
+                                                                <Eye size={13} />
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
         );
     };
@@ -430,48 +457,88 @@ const AdminDashboard = () => {
     });
 
     const renderPendingPool = () => {
+        // Collapsed state: show only a narrow toggle bar
+        if (!isPendingOpen) {
+            return (
+                <div
+                    style={{
+                        width: '38px', flexShrink: 0, background: 'var(--bg-card)',
+                        borderRight: '1px solid var(--border-structural)', display: 'flex',
+                        flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
+                        paddingTop: '1rem', borderRadius: '8px 0 0 8px', cursor: 'pointer', transition: 'width 0.2s'
+                    }}
+                    onClick={() => setIsPendingOpen(true)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => { setIsPendingOpen(true); handlePendingPoolDrop(e); }}
+                    title="展開待處理區"
+                >
+                    <div style={{
+                        writingMode: 'vertical-rl', textOrientation: 'mixed',
+                        fontSize: '0.75rem', fontWeight: '700', color: 'rgba(24,24,27,0.4)',
+                        letterSpacing: '0.05em', transform: 'rotate(180deg)', userSelect: 'none',
+                        display: 'flex', alignItems: 'center', gap: '6px'
+                    }}>
+                        待處理
+                        {pendingCandidates.length > 0 && (
+                            <span style={{
+                                background: 'var(--color-error)', color: 'white',
+                                borderRadius: '50%', width: '18px', height: '18px',
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '0.65rem', fontWeight: '800', flexShrink: 0
+                            }}>{pendingCandidates.length}</span>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div
-                style={{ width: '380px', flexShrink: 0, borderRight: '1px solid var(--border-structural)', background: 'var(--bg-card)', display: 'flex', flexDirection: 'column' }}
+                style={{ width: '300px', flexShrink: 0, borderRight: '1px solid var(--border-structural)', background: 'var(--bg-card)', display: 'flex', flexDirection: 'column', borderRadius: '8px 0 0 8px', transition: 'width 0.2s' }}
                 onDragOver={handleDragOver}
                 onDrop={handlePendingPoolDrop}
             >
-                <div style={{ padding: '1rem', borderBottom: '2px solid var(--border-structural)', background: '#F8FAFC', borderRadius: '12px 12px 0 0' }}>
+                <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-structural)', background: '#F8FAFC', borderRadius: '8px 0 0 0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h3 className="kanban-stage-title" style={{ margin: 0 }}>待處理 / 未分配 ({pendingCandidates.length})</h3>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-error)' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: '800', color: 'var(--color-structural)' }}>待處理 / 未分配</h3>
+                            {pendingCandidates.length > 0 && (
+                                <span style={{ background: 'var(--color-error)', color: 'white', borderRadius: '9999px', padding: '1px 8px', fontSize: '0.72rem', fontWeight: '800' }}>{pendingCandidates.length}</span>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setIsPendingOpen(false)}
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(24,24,27,0.35)', padding: '3px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}
+                            title="收合待處理區"
+                        >
+                            <X size={15} />
+                        </button>
                     </div>
-                    <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'rgba(24,24,27,0.6)' }}>請將未分配的履歷拖拉至右側流程，或反向拖拉回這裡取消分配。</p>
+                    <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: 'rgba(24,24,27,0.5)' }}>拖拉至右側流程以指派，或拖回此處取消分配。</p>
                 </div>
-                <div className="kanban-list" style={{ padding: '1rem', flex: 1, overflowY: 'auto' }}>
+                <div style={{ padding: '0.75rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                     {pendingCandidates.length === 0 ? (
-                        <div style={{ textAlign: 'center', color: 'rgba(24,24,27,0.4)', padding: '2rem 1rem', fontSize: '0.9rem' }}>目前無新進未分配的履歷</div>
+                        <div style={{ textAlign: 'center', color: 'rgba(24,24,27,0.35)', padding: '1.5rem 0.5rem', fontSize: '0.85rem' }}>目前無未分配的履歷</div>
                     ) : pendingCandidates.map(candidate => (
                         <div key={candidate.id} draggable onDragStart={(e) => handleDragStart(e, candidate.id)}
                             onDragOver={handleDragOver}
                             onDrop={(e) => { e.stopPropagation(); handlePendingPoolDrop(e); }}
                             style={{
-                                background: 'white', padding: '1rem', borderRadius: '8px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '0.5rem',
-                                border: '1px solid var(--border-structural)', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.02)', transition: 'all 0.2s', position: 'relative'
+                                background: 'white', padding: '0.55rem 0.7rem', borderRadius: '8px', cursor: 'grab',
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                border: '1px solid var(--border-structural)', boxShadow: '0 1px 3px rgba(0,0,0,0.03)', transition: 'all 0.15s'
                             }}
-                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 16px rgba(236, 72, 153, 0.12)'; e.currentTarget.style.borderColor = 'var(--color-accent-magenta)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.02)'; e.currentTarget.style.borderColor = 'var(--border-structural)'; }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(9,27,49,0.1)'; e.currentTarget.style.borderColor = 'rgba(9,27,49,0.25)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.03)'; e.currentTarget.style.borderColor = 'var(--border-structural)'; }}
                         >
-                            <GripVertical size={16} style={{ position: 'absolute', left: '-8px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(24,24,27,0.2)', opacity: 0 }} className="drag-handle" />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                                    <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--color-structural)' }}>
-                                        {candidate.name}
-                                    </div>
-                                </div>
-                                <button onClick={() => navigate(`/admin/candidates/${candidate.id}`)} style={{ background: 'rgba(30, 58, 138, 0.1)', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', padding: '4px', borderRadius: '4px' }} title="查看資料">
-                                    <Eye size={14} />
-                                </button>
+                            <GripVertical size={14} style={{ color: 'rgba(24,24,27,0.2)', flexShrink: 0 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--color-structural)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{candidate.name}</div>
+                                <div style={{ fontSize: '0.72rem', color: 'rgba(24,24,27,0.45)', marginTop: '1px' }}>{formatDate(candidate.created_at)}</div>
                             </div>
-                            <div style={{ fontSize: '0.8rem', color: 'rgba(24,24,27,0.6)', display: 'flex', justifyContent: 'space-between' }}>
-                                <span>{formatDate(candidate.created_at)}</span>
-                                <span style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>未分配</span>
-                            </div>
+                            <button onClick={() => navigate(`/admin/candidates/${candidate.id}`)} style={{ background: 'rgba(30,58,138,0.08)', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', padding: '4px', borderRadius: '4px', flexShrink: 0, display: 'flex', alignItems: 'center' }} title="查看資料">
+                                <Eye size={13} />
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -558,11 +625,11 @@ const AdminDashboard = () => {
                     [SYSTEM_ERROR] 無法載入資料: {error}
                 </div>
             ) : (
-                <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: '1.5rem' }}>
+                <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: '0' }}>
                     {renderPendingPool()}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingLeft: '1rem' }}>
                         {selectedCategoryId === '' ? (
-                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-card)', border: '1px dashed var(--border-structural)', borderRadius: '4px' }}>
+                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-card)', border: '1px dashed var(--border-structural)', borderRadius: '8px' }}>
                                 <div style={{ textAlign: 'center', color: 'rgba(24,24,27,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                                     <FileSpreadsheet size={48} />
                                     <div style={{ fontSize: '1.2rem', fontFamily: 'var(--font-heading)' }}>請選擇上方職缺以檢視甄試流程看板</div>

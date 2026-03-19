@@ -1,22 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, ShieldCheck, CheckCircle2, RotateCcw, PlayCircle } from 'lucide-react';
+
+const clearAllDrafts = () => {
+    localStorage.removeItem('basic_info_draft');
+    localStorage.removeItem('qa_draft');
+    localStorage.removeItem('candidateId');
+    localStorage.removeItem('jobCategoryId');
+    sessionStorage.removeItem('candidateId');
+    sessionStorage.removeItem('jobCategoryId');
+};
 
 const Welcome = () => {
     const navigate = useNavigate();
     const [agreed, setAgreed] = useState(false);
+    const [hasDraft, setHasDraft] = useState(false);
 
-    const handleStart = () => {
-        if (agreed) {
-            // Clear any leftover data from previous candidate before starting fresh
-            localStorage.removeItem('basic_info_draft');
-            localStorage.removeItem('qa_draft');
-            localStorage.removeItem('candidateId');
-            localStorage.removeItem('jobCategoryId');
-            sessionStorage.removeItem('candidateId');
-            sessionStorage.removeItem('jobCategoryId');
+    useEffect(() => {
+        // Check if there's leftover data from a previous (unfinished) session
+        const hasBasicDraft = !!localStorage.getItem('basic_info_draft');
+        const hasQaDraft = !!localStorage.getItem('qa_draft');
+        const hasCandidateId = !!localStorage.getItem('candidateId');
+        setHasDraft(hasBasicDraft || hasQaDraft || hasCandidateId);
+    }, []);
+
+    const handleContinue = () => {
+        // Resume where left off — no clearing
+        const candidateId = localStorage.getItem('candidateId');
+        if (candidateId) {
+            // Already past BasicInfo, go to QA
+            sessionStorage.setItem('candidateId', candidateId);
+            const jobCategoryId = localStorage.getItem('jobCategoryId');
+            if (jobCategoryId) sessionStorage.setItem('jobCategoryId', jobCategoryId);
+            navigate('/qa');
+        } else {
             navigate('/basic-info');
         }
+    };
+
+    const handleFresh = () => {
+        clearAllDrafts();
+        navigate('/basic-info');
+    };
+
+    const handleStart = () => {
+        if (!agreed) return;
+        if (hasDraft) return; // UI shows two buttons instead
+        navigate('/basic-info');
     };
 
     return (
@@ -155,22 +185,58 @@ const Welcome = () => {
                     </span>
                 </label>
 
-                {/* CTA Button */}
-                <button
-                    onClick={handleStart}
-                    disabled={!agreed}
-                    className="btn-wizard btn-wizard-next"
-                    style={{
-                        width: '100%',
-                        justifyContent: 'center',
-                        padding: '1.1rem 2rem',
-                        fontSize: '1.1rem',
-                        fontWeight: '700',
-                        letterSpacing: '0.02em',
-                    }}
-                >
-                    開始填寫 <ChevronRight size={20} />
-                </button>
+                {/* CTA Area — changes based on whether draft data exists */}
+                {agreed && hasDraft ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {/* Draft notice */}
+                        <div style={{
+                            background: '#fff7ed', border: '1.5px solid #fb923c',
+                            borderRadius: '12px', padding: '0.9rem 1.2rem',
+                            display: 'flex', alignItems: 'center', gap: '0.75rem',
+                        }}>
+                            <span style={{ fontSize: '1.3rem' }}>📋</span>
+                            <div>
+                                <div style={{ fontWeight: '700', fontSize: '0.92rem', color: '#c2410c' }}>偵測到上次未完成的填寫資料</div>
+                                <div style={{ fontSize: '0.82rem', color: '#9a3412', marginTop: '2px' }}>是否要繼續填寫，還是重新開始？</div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <button
+                                onClick={handleFresh}
+                                style={{
+                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                    padding: '0.9rem', borderRadius: '10px', border: '1.5px solid #e2e8f0',
+                                    background: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem',
+                                    color: '#64748b', transition: 'all 0.2s',
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#64748b'; }}
+                            >
+                                <RotateCcw size={16} /> 重新開始
+                            </button>
+                            <button
+                                onClick={handleContinue}
+                                className="btn-wizard btn-wizard-next"
+                                style={{ flex: 2, justifyContent: 'center', padding: '0.9rem', fontSize: '1rem', fontWeight: '700' }}
+                            >
+                                <PlayCircle size={18} /> 繼續上次填寫
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <button
+                        onClick={handleStart}
+                        disabled={!agreed}
+                        className="btn-wizard btn-wizard-next"
+                        style={{
+                            width: '100%', justifyContent: 'center',
+                            padding: '1.1rem 2rem', fontSize: '1.1rem',
+                            fontWeight: '700', letterSpacing: '0.02em',
+                        }}
+                    >
+                        開始填寫 <ChevronRight size={20} />
+                    </button>
+                )}
             </div>
         </div>
     );

@@ -136,12 +136,14 @@ exports.findAll = () => {
 exports.getAnswersByCandidate = (candidateId) => {
     return all(`
         SELECT a.*,
-               CASE WHEN a.question_code ~ '^[0-9]+$'
-                    THEN q.question_text
-                    ELSE NULL
-               END AS question_text
+               q.question_text
         FROM answers a
-        LEFT JOIN questions q ON a.question_code ~ '^[0-9]+$' AND q.id = CAST(a.question_code AS INTEGER)
+        LEFT JOIN questions q
+          ON a.question_code ~ '^[0-9]+$'
+          AND q.id = CAST(
+              CASE WHEN a.question_code ~ '^[0-9]+$' THEN a.question_code ELSE NULL END
+              AS INTEGER
+          )
         WHERE a.candidate_id = ?
         ORDER BY a.id ASC
     `, [candidateId]);
